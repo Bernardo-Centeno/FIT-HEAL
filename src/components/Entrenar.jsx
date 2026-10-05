@@ -3,7 +3,7 @@ import {
   generarPlan, planVencido, sugerirProgresion, feedbackSesion, cumplimientoSemanal, diasDesde,
 } from '../lib/plan.js'
 import { planConIA, explicarEjercicio } from '../lib/ai.js'
-import { records as calcularRecords } from '../lib/progreso.js'
+import { records as calcularRecords } from '../lib/metricas.js'
 import Explicacion from './Explicacion.jsx'
 import Descanso from './Descanso.jsx'
 import Icono from './Icono.jsx'

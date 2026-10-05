@@ -1,7 +1,7 @@
 import React from 'react'
 import { objetivosNutricion, deporteActivo, planVencido, diasDesde } from '../lib/plan.js'
 import { totalesDelDia } from '../lib/alimentos.js'
-import { proximoDia, entrenoHoy, semanaActual, rachaSemanas, minutosEstimados } from '../lib/progreso.js'
+import { proximoDia, entrenoHoy, semanaActual, rachaSemanas, minutosEstimados } from '../lib/metricas.js'
 import { Anillos, anillosDe } from './Graficos.jsx'
 import Icono from './Icono.jsx'
 
