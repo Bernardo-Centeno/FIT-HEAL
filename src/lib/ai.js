@@ -41,6 +41,7 @@ async function llamar({ apiKey, modelo, system, content, maxTokens = 1500 }) {
 
 const resumenPerfil = p => `Perfil: ${p.sexo}, ${p.edad} años, ${p.pesoKg} kg, ${p.alturaCm} cm.
 Objetivo: ${p.objetivo}. Nivel: ${p.nivel}. Entrena ${p.diasPorSemana} días por semana en ${p.equipamiento}.
+Deporte: ${p.deporte && p.deporte.trim() && Number(p.deporteDias) > 0 ? `${p.deporte.trim()}, ${p.deporteDias} días por semana (${p.deporteTemporada === 'fuera' ? 'fuera de temporada' : 'en temporada'})` : 'ninguno'}.
 Lesiones o limitaciones: ${p.lesiones || 'ninguna'}.
 Horarios y vida diaria: ${p.horarios || 'sin datos'}.
 No come: ${p.noComo || 'sin restricciones'}. Alergias o intolerancias: ${p.alergias || 'ninguna'}.
