@@ -18,6 +18,9 @@ export const estadoInicial = {
     alergias: '',
     presupuesto: 'medio',
     minutosParaCocinar: 30,
+    deporte: '', // vacío = ninguno
+    deporteDias: 2,
+    deporteTemporada: 'en', // en | fuera
   },
   plan: null,
   sesiones: [],

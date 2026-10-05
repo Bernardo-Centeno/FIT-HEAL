@@ -76,6 +76,36 @@ export function esquema(objetivo, nivel, tipo, unidad) {
   if (objetivo === 'grasa') return { series: 3, repsMin: 12, repsMax: 15 }
   return { series: 3, repsMin: 10, repsMax: 15 }
 }
+// ---------- Deporte ----------
+export const deporteActivo = p => !!(p.deporte && p.deporte.trim()) && Number(p.deporteDias) > 0
+
+// Deportes que cargan mucho las piernas (se compara sin tildes ni mayúsculas)
+const PIERNAS_EXIGENTES = /futbol|rugby|basquet|basket|voley|hockey|tenis|padel|running|correr|trail|maraton|atletismo|ciclismo|bici|handball|esqui|ski/
+
+export function deporteExigePiernas(deporte = '') {
+  const t = deporte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  return PIERNAS_EXIGENTES.test(t)
+}
+
+function armarNota(perfil, diasGym) {
+  const notas = []
+  if (perfil.lesiones && perfil.lesiones.trim()) {
+    notas.push('Cargaste lesiones o limitaciones. Este plan automático NO las tiene en cuenta: revisalo con un profesional antes de empezar.')
+  }
+  if (deporteActivo(perfil)) {
+    const n = Number(perfil.deporteDias)
+    const dep = `${perfil.deporte.trim()} ${n} ${n === 1 ? 'día' : 'días'} por semana`
+    if (deporteExigePiernas(perfil.deporte)) {
+      notas.push(`Como hacés ${dep}, bajé una serie en los ejercicios de piernas. Evitá entrenar piernas el día antes de jugar o competir.`)
+    } else {
+      notas.push(`Hacés ${dep}: tené en cuenta ese desgaste al elegir qué días entrenar.`)
+    }
+    if (diasGym + n >= 7) {
+      notas.push('Entre gym y deporte no te queda ningún día de descanso. Considerá bajar los días de gym.')
+    }
+  }
+  return notas.join(' ')
+}
 
 // ---------- Generación del plan ----------
 export function generarPlan(perfil, hoy = new Date()) {
@@ -83,15 +113,13 @@ export function generarPlan(perfil, hoy = new Date()) {
   const lugar = perfil.equipamiento === 'casa' ? 'casa' : 'gimnasio'
   const lib = BIBLIOTECA[lugar]
   const usados = {} // cuántas veces se usó cada patrón, para variar ejercicios entre días
-
+  const bajarPiernas = deporteActivo(perfil) && deporteExigePiernas(perfil.deporte)
   const plan = {
     creadoEl: hoy.toISOString(),
     semanasCiclo: 6,
     objetivo: perfil.objetivo,
     origen: 'reglas',
-    nota: perfil.lesiones && perfil.lesiones.trim()
-      ? 'Cargaste lesiones o limitaciones. Este plan automático NO las tiene en cuenta: revisalo con un profesional antes de empezar.'
-      : '',
+    nota: armarNota(perfil, dias),
     dias: SPLITS[dias].map((clave, i) => {
       const def = DIAS[clave]
       const ejercicios = def.patrones.map((patron, j) => {
@@ -99,8 +127,9 @@ export function generarPlan(perfil, hoy = new Date()) {
         const n = usados[patron] || 0
         usados[patron] = n + 1
         const base = opciones[n % opciones.length]
-        const { series, repsMin, repsMax } = esquema(perfil.objetivo, perfil.nivel, base.tipo, base.unidad)
-        return {
+        const esq = esquema(perfil.objetivo, perfil.nivel, base.tipo, base.unidad)
+        const { repsMin, repsMax } = esq
+        const series = base.inferior && bajarPiernas ? Math.max(2, esq.series - 1) : esq.series        return {
           id: slug(base.nombre), // sin posición: el historial del ejercicio se conserva entre planes
           nombre: base.nombre,
           tipo: base.tipo,
@@ -235,18 +264,24 @@ export function cumplimientoSemanal(sesiones, diasPorSemana, hoy = new Date()) {
 }
 
 // ---------- Nutrición por reglas ----------
-export function objetivosNutricion(perfil, diaEntrenamiento = true) {
+// tipoDia: 'entreno' | 'descanso' | 'deporte' (también acepta true/false por compatibilidad)
+export function objetivosNutricion(perfil, tipoDia = 'entreno') {
+  const tipo = tipoDia === true ? 'entreno' : tipoDia === false ? 'descanso' : tipoDia
   const w = Number(perfil.pesoKg) || 70
   const h = Number(perfil.alturaCm) || 170
   const a = Number(perfil.edad) || 30
   const bmr = 10 * w + 6.25 * h - 5 * a + (perfil.sexo === 'femenino' ? -161 : 5)
-  const factor = 1.2 + 0.075 * (Number(perfil.diasPorSemana) || 3)
+
+  // Días de actividad por semana: gym + deporte (fuera de temporada cuenta la mitad), máximo 7
+  const diasDeporte = deporteActivo(perfil) ? Number(perfil.deporteDias) * (perfil.deporteTemporada === 'fuera' ? 0.5 : 1) : 0
+  const diasActivos = Math.min(7, (Number(perfil.diasPorSemana) || 3) + diasDeporte)
+  const factor = 1.2 + 0.075 * diasActivos
   const mantenimiento = bmr * factor
 
   const ajuste = { masa: 1.1, fuerza: 1.05, grasa: 0.85, salud: 1.0 }[perfil.objetivo] ?? 1.0
   let kcal = mantenimiento * ajuste
   kcal = Math.max(kcal, bmr) // nunca por debajo del metabolismo basal
-  kcal *= diaEntrenamiento ? 1.05 : 0.95
+  kcal *= { entreno: 1.05, deporte: 1.08, descanso: 0.95 }[tipo] ?? 1
 
   const protPorKg = { masa: 1.8, fuerza: 1.8, grasa: 2.0, salud: 1.4 }[perfil.objetivo] ?? 1.6
   const proteinaG = protPorKg * w

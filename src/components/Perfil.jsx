@@ -64,6 +64,30 @@ export default function Perfil({ estado, actualizar, irA }) {
           <textarea rows={2} value={p.lesiones} onChange={txt('lesiones')} placeholder="Ej: molestia en el hombro derecho" />
         </label>
       </section>
+      <section className="card">
+        <h2>Deporte</h2>
+        <label>¿Practicás algún deporte?
+          <input list="deportes" value={p.deporte} onChange={txt('deporte')} placeholder="Ej: fútbol, running, tenis (vacío si ninguno)" />
+          <datalist id="deportes">
+            {['Fútbol', 'Rugby', 'Básquet', 'Vóley', 'Hockey', 'Tenis', 'Pádel', 'Running', 'Ciclismo', 'Natación', 'Boxeo', 'Artes marciales', 'Esquí'].map(d => <option key={d} value={d} />)}
+          </datalist>
+        </label>
+        {p.deporte.trim() !== '' && (
+          <div className="fila">
+            <label>Días por semana
+              <select value={p.deporteDias} onChange={num('deporteDias')}>
+                {[0, 1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+            <label>Momento
+              <select value={p.deporteTemporada} onChange={txt('deporteTemporada')}>
+                <option value="en">En temporada</option>
+                <option value="fuera">Fuera de temporada</option>
+              </select>
+            </label>
+          </div>
+        )}
+      </section>
 
       <section className="card">
         <h2>Tu día a día y la comida</h2>
