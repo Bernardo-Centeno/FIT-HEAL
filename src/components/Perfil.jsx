@@ -1,5 +1,5 @@
 import React from 'react'
-import { objetivosNutricion } from '../lib/plan.js'
+import { objetivosNutricion, DIVISIONES } from '../lib/plan.js'
 
 export default function Perfil({ estado, actualizar, irA }) {
   const p = estado.perfil
@@ -9,6 +9,7 @@ export default function Perfil({ estado, actualizar, irA }) {
 
   const entreno = objetivosNutricion(p, true)
   const descanso = objetivosNutricion(p, false)
+  const division = DIVISIONES[p.division] || DIVISIONES.auto
 
   return (
     <div className="pantalla">
@@ -60,10 +61,20 @@ export default function Perfil({ estado, actualizar, irA }) {
             <option value="casa">En casa (mancuernas y peso corporal)</option>
           </select>
         </label>
+        <label>División del plan
+          <select value={p.division} onChange={txt('division')}>
+            {Object.entries(DIVISIONES).map(([clave, d]) => <option key={clave} value={clave}>{d.nombre}</option>)}
+          </select>
+        </label>
+        {!division.dias.includes(Number(p.diasPorSemana)) && (
+          <p className="aviso">Esta división no está disponible para {p.diasPorSemana} días. Se va a usar la automática.</p>
+        )}
+        <p className="nota">{division.descripcion}</p>
         <label>Lesiones o limitaciones
           <textarea rows={2} value={p.lesiones} onChange={txt('lesiones')} placeholder="Ej: molestia en el hombro derecho" />
         </label>
       </section>
+
       <section className="card">
         <h2>Deporte</h2>
         <label>¿Practicás algún deporte?

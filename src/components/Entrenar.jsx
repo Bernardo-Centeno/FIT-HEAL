@@ -1,0 +1,224 @@
+import React, { useMemo, useState } from 'react'
+import {
+  generarPlan, planVencido, sugerirProgresion, feedbackSesion, cumplimientoSemanal, diasDesde,
+} from '../lib/plan.js'
+import { planConIA, explicarEjercicio } from '../lib/ai.js'
+import Explicacion from './Explicacion.jsx'
+import { uid } from '../lib/storage.js'
+
+const ICONO = { subir: '⬆️', mantener: '➡️', bajar: '⬇️', estancado: '⚠️', nuevo: '🆕' }
+
+export default function Entrenar({ estado, actualizar, irA }) {
+  const { plan, perfil, sesiones, ajustes } = estado
+  const [diaIdx, setDiaIdx] = useState(0)
+  const [borrador, setBorrador] = useState({})
+  const [feedback, setFeedback] = useState(null)
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState('')
+  const [abierto, setAbierto] = useState(null) // id del ejercicio con la explicación abierta
+  const [textosIA, setTextosIA] = useState({}) // explicaciones pedidas a la IA, por id
+  const [cargandoIA, setCargandoIA] = useState('')
+
+  const dia = plan ? plan.dias[Math.min(diaIdx, plan.dias.length - 1)] : null
+  const cumplimiento = cumplimientoSemanal(sesiones, perfil.diasPorSemana)
+
+  const sugerencias = useMemo(() => {
+    if (!dia) return {}
+    return Object.fromEntries(dia.ejercicios.map(ej => [ej.id, sugerirProgresion(ej, sesiones)]))
+  }, [dia, sesiones])
+
+  const crearPlanReglas = () => {
+    actualizar(e => ({ ...e, plan: generarPlan(e.perfil) }))
+    setDiaIdx(0); setBorrador({}); setFeedback(null); setError('')
+  }
+
+  const crearPlanIA = async () => {
+    setCargando(true); setError('')
+    try {
+      const nuevo = await planConIA({ ajustes, perfil, planActual: plan, sesiones, comidas: estado.comidas })
+      actualizar(e => ({ ...e, plan: nuevo }))
+      setDiaIdx(0); setBorrador({}); setFeedback(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  const pedirExplicacionIA = async ej => {
+    setCargandoIA(ej.id); setError('')
+    try {
+      const texto = await explicarEjercicio({ ajustes, perfil, ejercicio: ej })
+      setTextosIA(t => ({ ...t, [ej.id]: texto }))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setCargandoIA('')
+    }
+  }
+
+  const campo = (ej, parte, valor, i) => {
+    setBorrador(b => {
+      const actual = b[ej.id] || { peso: '', reps: [], rpe: '' }
+      if (parte === 'reps') {
+        const reps = [...actual.reps]
+        reps[i] = valor
+        return { ...b, [ej.id]: { ...actual, reps } }
+      }
+      return { ...b, [ej.id]: { ...actual, [parte]: valor } }
+    })
+  }
+
+  const pesoMostrado = ej => {
+    const b = borrador[ej.id]
+    if (b && b.peso !== '') return b.peso
+    const s = sugerencias[ej.id]
+    return s && s.pesoSugerido ? s.pesoSugerido : (ej.pesoKg || '')
+  }
+
+  const guardarSesion = () => {
+    const series = []
+    dia.ejercicios.forEach(ej => {
+      const b = borrador[ej.id]
+      if (!b) return
+      const peso = ej.corporal ? Number(b.peso) || 0 : Number(pesoMostrado(ej)) || 0
+      for (let i = 0; i < ej.series; i++) {
+        const reps = Number(b.reps[i])
+        if (reps > 0) series.push({ ejercicioId: ej.id, nombre: ej.nombre, pesoKg: peso, reps, rpe: Number(b.rpe) || null })
+      }
+    })
+    if (series.length === 0) { setError('Anotá al menos una serie antes de guardar.'); return }
+    setError('')
+    const sesion = { id: uid(), fecha: new Date().toISOString(), diaNombre: dia.nombre, series }
+    const todas = [...sesiones, sesion]
+    const fb = feedbackSesion(plan, sesion, todas)
+    actualizar(e => ({
+      ...e,
+      sesiones: todas,
+      // el peso de partida de la próxima vez queda en el plan
+      plan: {
+        ...e.plan,
+        dias: e.plan.dias.map(d => d.nombre !== dia.nombre ? d : {
+          ...d,
+          ejercicios: d.ejercicios.map(ej => {
+            const f = fb.find(x => x.ejercicio === ej.nombre)
+            return f && f.pesoSugerido ? { ...ej, pesoKg: f.pesoSugerido } : ej
+          }),
+        }),
+      },
+    }))
+    setFeedback(fb)
+    setBorrador({})
+  }
+
+  const vencido = planVencido(plan)
+
+  if (!plan) {
+    return (
+      <div className="pantalla">
+        <section className="card destacada">
+          <h2>Todavía no tenés plan</h2>
+          <p>Armo un plan según tu perfil ({perfil.diasPorSemana} días por semana, {perfil.equipamiento === 'casa' ? 'en casa' : 'en gimnasio'}, objetivo: {perfil.objetivo}).</p>
+          <button className="primario" onClick={crearPlanReglas}>Crear mi plan</button>
+          <button onClick={crearPlanIA} disabled={!ajustes.apiKey || cargando}>
+            {cargando ? 'Pensando…' : 'Crear con IA'}
+          </button>
+          {!ajustes.apiKey && <p className="nota">Para usar la IA pegá tu clave en <a href="#ajustes" onClick={e => { e.preventDefault(); irA('ajustes') }}>Ajustes</a>.</p>}
+          {error && <p className="error">{error}</p>}
+          <p className="nota">Si todavía no cargaste tus datos, hacelo primero en <a href="#perfil" onClick={e => { e.preventDefault(); irA('perfil') }}>Perfil</a>.</p>
+        </section>
+      </div>
+    )
+  }
+
+  return (
+    <div className="pantalla">
+      <section className="card">
+        <div className="fila-sb">
+          <strong>Esta semana: {cumplimiento.hechas} de {cumplimiento.objetivo} sesiones</strong>
+          <span className="chip">{plan.origen === 'ia' ? 'Plan con IA' : 'Plan por reglas'}</span>
+        </div>
+        <progress max={cumplimiento.objetivo} value={Math.min(cumplimiento.hechas, cumplimiento.objetivo)} />
+        {plan.nota && <p className="nota">{plan.nota}</p>}
+        {vencido && (
+          <p className="aviso">Hace {diasDesde(plan.creadoEl)} días que armaste este plan. Ya toca renovarlo según tu progreso.</p>
+        )}
+        <div className="fila">
+          <button onClick={crearPlanReglas}>Plan nuevo (reglas)</button>
+          <button onClick={crearPlanIA} disabled={!ajustes.apiKey || cargando}>{cargando ? 'Pensando…' : 'Plan nuevo (IA)'}</button>
+        </div>
+        {!ajustes.apiKey && <p className="nota">La opción con IA necesita tu clave en Ajustes.</p>}
+        {error && <p className="error">{error}</p>}
+      </section>
+
+      <div className="pildoras">
+        {plan.dias.map((d, i) => (
+          <button key={i} className={i === diaIdx ? 'activa' : ''} onClick={() => { setDiaIdx(i); setFeedback(null); setBorrador({}) }}>{d.nombre}</button>
+        ))}
+      </div>
+
+      {dia.ejercicios.map(ej => {
+        const s = sugerencias[ej.id]
+        const b = borrador[ej.id] || { peso: '', reps: [], rpe: '' }
+        const unidad = ej.unidad === 'seg' ? 'seg' : 'reps'
+        return (
+          <section key={ej.id} className="card ejercicio">
+            <div className="fila-sb">
+              <h3>{ej.nombre}</h3>
+              <span className="chip">{ej.series} × {ej.repsMin}-{ej.repsMax} {unidad}</span>
+            </div>
+            <button className="enlace" onClick={() => setAbierto(abierto === ej.id ? null : ej.id)}>
+              {abierto === ej.id ? 'Ocultar explicación' : '❓ Cómo se hace'}
+            </button>
+            {abierto === ej.id && (
+              <Explicacion ej={ej} texto={textosIA[ej.id]} cargando={cargandoIA === ej.id} tieneIA={!!ajustes.apiKey} onPedirIA={() => pedirExplicacionIA(ej)} />
+            )}
+            {s && <p className={`sugerencia ${s.accion}`}>{ICONO[s.accion]} {s.mensaje}</p>}
+            {!ej.corporal && (
+              <label>Peso (kg)
+                <input type="number" inputMode="decimal" step="0.5" value={pesoMostrado(ej)} onChange={ev => campo(ej, 'peso', ev.target.value)} />
+              </label>
+            )}
+            <div className="series">
+              {Array.from({ length: ej.series }).map((_, i) => (
+                <label key={i}>Serie {i + 1}
+                  <input type="number" inputMode="numeric" placeholder={unidad} value={b.reps[i] ?? ''} onChange={ev => campo(ej, 'reps', ev.target.value, i)} />
+                </label>
+              ))}
+            </div>
+            <label>Esfuerzo (1 fácil – 10 al límite)
+              <input type="number" inputMode="decimal" min="1" max="10" step="0.5" value={b.rpe} onChange={ev => campo(ej, 'rpe', ev.target.value)} />
+            </label>
+          </section>
+        )
+      })}
+
+      {error && <p className="error">{error}</p>}
+      <button className="primario grande" onClick={guardarSesion}>Guardar sesión</button>
+
+      {feedback && (
+        <section className="card destacada">
+          <h2>Cómo te fue</h2>
+          {feedback.length === 0 && <p>Sin datos para evaluar.</p>}
+          {feedback.map((f, i) => (
+            <p key={i} className={`sugerencia ${f.accion}`}><strong>{f.ejercicio}:</strong> {ICONO[f.accion]} {f.mensaje}</p>
+          ))}
+        </section>
+      )}
+
+      {sesiones.length > 0 && (
+        <section className="card">
+          <h2>Últimas sesiones</h2>
+          {[...sesiones].reverse().slice(0, 5).map(s => (
+            <details key={s.id}>
+              <summary>{new Date(s.fecha).toLocaleDateString('es-AR')} · {s.diaNombre}</summary>
+              <ul>
+                {s.series.map((x, i) => <li key={i}>{x.nombre}: {x.pesoKg ? `${x.pesoKg} kg × ` : ''}{x.reps}</li>)}
+              </ul>
+            </details>
+          ))}
+        </section>
+      )}
+    </div>
+  )
+}

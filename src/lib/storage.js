@@ -12,6 +12,7 @@ export const estadoInicial = {
     nivel: 'principiante', // principiante | intermedio | avanzado
     diasPorSemana: 3,
     equipamiento: 'gimnasio', // gimnasio | casa
+    division: 'auto', // auto | completo | superior_inferior | ppl
     lesiones: '',
     horarios: '',
     noComo: '',

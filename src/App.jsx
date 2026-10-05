@@ -1,14 +1,20 @@
 import React, { useEffect, useState } from 'react'
 import { cargar, guardar } from './lib/storage.js'
 import Perfil from './components/Perfil.jsx'
+import Entrenar from './components/Entrenar.jsx'
+import Comida from './components/Comida.jsx'
+import Ajustes from './components/Ajustes.jsx'
 
 const TABS = [
+  { id: 'entrenar', label: 'Entrenar', icono: '🏋️' },
+  { id: 'comida', label: 'Comida', icono: '🍽️' },
   { id: 'perfil', label: 'Perfil', icono: '👤' },
+  { id: 'ajustes', label: 'Ajustes', icono: '⚙️' },
 ]
 
 export default function App() {
   const [estado, setEstado] = useState(cargar)
-  const [tab, setTab] = useState('perfil')
+  const [tab, setTab] = useState(() => (cargar().plan ? 'entrenar' : 'perfil'))
 
   useEffect(() => { guardar(estado) }, [estado])
 
@@ -25,7 +31,10 @@ export default function App() {
       </header>
 
       <main className="contenido">
+        {tab === 'entrenar' && <Entrenar {...props} />}
+        {tab === 'comida' && <Comida {...props} />}
         {tab === 'perfil' && <Perfil {...props} />}
+        {tab === 'ajustes' && <Ajustes {...props} />}
       </main>
 
       <nav className="tabs">

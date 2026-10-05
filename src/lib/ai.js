@@ -64,9 +64,9 @@ Analizá este plato: 1) qué ves, 2) estimación aproximada de calorías y macro
   return llamar({ apiKey: ajustes.apiKey, modelo: ajustes.modelo, system: BASE, content, maxTokens: 900 })
 }
 
-export async function sugerirComidaYReceta({ ajustes, perfil, objetivos, pedido, esDiaEntrenamiento, ingredientes }) {
+export async function sugerirComidaYReceta({ ajustes, perfil, objetivos, pedido, tipoDia, ingredientes }) {
   const text = `${resumenPerfil(perfil)}
-Hoy es día de ${esDiaEntrenamiento ? 'entrenamiento' : 'descanso'}. Metas del día: ${objetivos.kcal} kcal, ${objetivos.proteinaG} g de proteína, ${objetivos.carbosG} g de carbohidratos, ${objetivos.grasasG} g de grasas.
+Hoy es día de ${{ entreno: 'entrenamiento', deporte: 'deporte o competencia', descanso: 'descanso' }[tipoDia] || 'entrenamiento'}. Metas del día: ${objetivos.kcal} kcal, ${objetivos.proteinaG} g de proteína, ${objetivos.carbosG} g de carbohidratos, ${objetivos.grasasG} g de grasas.
 ${ingredientes ? 'Tengo en casa: ' + ingredientes : ''}
 Pedido: ${pedido || 'Sugerime qué comer hoy'}
 
@@ -96,7 +96,7 @@ Cantidad de comidas registradas últimamente: ${comidas.slice(-14).length}.
 
 Armá el plan de las próximas 4 a 6 semanas ajustado a mi historial. Respondé SOLO con un JSON válido, sin texto extra, con esta forma exacta:
 {"nota":"resumen breve de qué cambió y por qué","dias":[{"nombre":"...","ejercicios":[{"nombre":"...","tipo":"compuesto|aislamiento","unidad":"reps|seg","corporal":false,"inferior":false,"series":3,"repsMin":8,"repsMax":12,"pesoKg":0}]}]}
-Usá exactamente ${perfil.diasPorSemana} días, 4 a 6 ejercicios por día, y poné en pesoKg el peso de partida sugerido según mi historial (0 si es corporal o no hay datos). Respetá mis lesiones y mi equipamiento.`
+Usá exactamente ${perfil.diasPorSemana} días, 4 a 6 ejercicios por día, y poné en pesoKg el peso de partida sugerido según mi historial (0 si es corporal o no hay datos). Respetá mis lesiones y mi equipamiento. Si hago un deporte, adaptá el plan a ese deporte y a su desgaste (por ejemplo, no cargar de más las piernas cerca de los partidos).`
   const raw = await llamar({ apiKey: ajustes.apiKey, modelo: ajustes.modelo, system: BASE, content: text, maxTokens: 3000 })
   return parsearPlan(raw, perfil)
 }
@@ -117,7 +117,7 @@ export function parsearPlan(raw, perfil, hoy = new Date()) {
     dias: data.dias.map((d, i) => ({
       nombre: String(d.nombre || `Día ${i + 1}`),
       ejercicios: (d.ejercicios || []).map((e, j) => ({
-        id: String(e.nombre || `ej-${i}-${j}`).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        id: String(e.nombre || `ej-${i}-${j}`).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
         nombre: String(e.nombre || 'Ejercicio'),
         tipo: e.tipo === 'aislamiento' ? 'aislamiento' : 'compuesto',
         unidad: e.unidad === 'seg' ? 'seg' : 'reps',
@@ -158,4 +158,11 @@ export function reducirImagen(file, maxLado = 1280) {
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo abrir la foto')) }
     img.src = url
   })
+}
+
+export async function explicarEjercicio({ ajustes, perfil, ejercicio }) {
+  const unidad = ejercicio.unidad === 'seg' ? 'segundos' : 'repeticiones'
+  const text = `${resumenPerfil(perfil)}
+Explicame cómo hacer el ejercicio "${ejercicio.nombre}" (${ejercicio.series} series de ${ejercicio.repsMin}-${ejercicio.repsMax} ${unidad}). Incluí: qué músculos trabaja, los pasos de la técnica (3 a 5), 2 errores comunes y una alternativa más fácil por si me cuesta. Tené en cuenta mis lesiones y mi nivel. Sé breve y respondé en texto plano, sin tablas.`
+  return llamar({ apiKey: ajustes.apiKey, modelo: ajustes.modelo, system: BASE, content: text, maxTokens: 700 })
 }
