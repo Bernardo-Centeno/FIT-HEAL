@@ -43,11 +43,13 @@ const BIBLIOTECA = {
   },
 }
 
-// ---------- Divisiones por días ----------
+// ---------- Días de entrenamiento (qué patrones de movimiento lleva cada uno) ----------
 const DIAS = {
   fullA: { nombre: 'Cuerpo completo A', patrones: ['pierna_cuad', 'empuje_h', 'tiron_h', 'hombro_lat', 'core'] },
   fullB: { nombre: 'Cuerpo completo B', patrones: ['bisagra', 'empuje_v', 'tiron_v', 'biceps', 'triceps'] },
   fullC: { nombre: 'Cuerpo completo C', patrones: ['pierna_acc', 'empuje_h', 'tiron_h', 'isquios', 'core'] },
+  fullD: { nombre: 'Cuerpo completo D', patrones: ['bisagra', 'empuje_h', 'tiron_h', 'hombro_lat', 'triceps'] },
+  fullE: { nombre: 'Cuerpo completo E', patrones: ['pierna_acc', 'empuje_v', 'tiron_v', 'biceps', 'core'] },
   superior: { nombre: 'Tren superior', patrones: ['empuje_h', 'tiron_h', 'empuje_v', 'tiron_v', 'biceps', 'triceps'] },
   inferior: { nombre: 'Tren inferior', patrones: ['pierna_cuad', 'bisagra', 'pierna_acc', 'isquios', 'gemelos', 'core'] },
   empuje: { nombre: 'Empuje', patrones: ['empuje_h', 'empuje_v', 'empuje_h', 'hombro_lat', 'triceps'] },
@@ -55,12 +57,46 @@ const DIAS = {
   piernas: { nombre: 'Piernas', patrones: ['pierna_cuad', 'bisagra', 'pierna_acc', 'isquios', 'gemelos', 'core'] },
 }
 
+// ---------- Divisiones del plan ----------
+export const DIVISIONES = {
+  auto: { nombre: 'Automática (recomendada)', dias: [2, 3, 4, 5, 6], descripcion: 'Elige según tus días: cuerpo completo con 2-3, superior/inferior con 4, y empuje/tirón/piernas con 5-6.' },
+  completo: { nombre: 'Cuerpo completo', dias: [2, 3, 4, 5], descripcion: 'Todo el cuerpo en cada sesión. Buena opción si entrenás pocos días o querés trabajar cada músculo varias veces por semana.' },
+  superior_inferior: { nombre: 'Superior / inferior', dias: [2, 3, 4, 5, 6], descripcion: 'Alterna tren superior e inferior. Con 4 días cada músculo se trabaja unas 2 veces por semana, y te deja manejar mejor los días de piernas si hacés deporte.' },
+  ppl: { nombre: 'Empuje / tirón / piernas', dias: [3, 4, 5, 6], descripcion: 'Un día de empuje (pecho, hombros, tríceps), uno de tirón (espalda, bíceps) y uno de piernas. Con 3 o 4 días cada músculo se entrena pocas veces por semana; rinde mejor con 5 o 6.' },
+}
+
 const SPLITS = {
-  2: ['fullA', 'fullB'],
-  3: ['fullA', 'fullB', 'fullC'],
-  4: ['superior', 'inferior', 'superior', 'inferior'],
-  5: ['empuje', 'tiron', 'piernas', 'superior', 'inferior'],
-  6: ['empuje', 'tiron', 'piernas', 'empuje', 'tiron', 'piernas'],
+  auto: {
+    2: ['fullA', 'fullB'],
+    3: ['fullA', 'fullB', 'fullC'],
+    4: ['superior', 'inferior', 'superior', 'inferior'],
+    5: ['empuje', 'tiron', 'piernas', 'superior', 'inferior'],
+    6: ['empuje', 'tiron', 'piernas', 'empuje', 'tiron', 'piernas'],
+  },
+  completo: {
+    2: ['fullA', 'fullB'],
+    3: ['fullA', 'fullB', 'fullC'],
+    4: ['fullA', 'fullB', 'fullC', 'fullD'],
+    5: ['fullA', 'fullB', 'fullC', 'fullD', 'fullE'],
+  },
+  superior_inferior: {
+    2: ['superior', 'inferior'],
+    3: ['superior', 'inferior', 'superior'],
+    4: ['superior', 'inferior', 'superior', 'inferior'],
+    5: ['superior', 'inferior', 'superior', 'inferior', 'superior'],
+    6: ['superior', 'inferior', 'superior', 'inferior', 'superior', 'inferior'],
+  },
+  ppl: {
+    3: ['empuje', 'tiron', 'piernas'],
+    4: ['empuje', 'tiron', 'piernas', 'superior'],
+    5: ['empuje', 'tiron', 'piernas', 'superior', 'inferior'],
+    6: ['empuje', 'tiron', 'piernas', 'empuje', 'tiron', 'piernas'],
+  },
+}
+
+// Si la división elegida no existe para esa cantidad de días, se usa la automática.
+export function elegirSplit(division, dias) {
+  return (SPLITS[division] && SPLITS[division][dias]) || SPLITS.auto[dias]
 }
 
 // ---------- Series y repeticiones según objetivo ----------
@@ -76,6 +112,7 @@ export function esquema(objetivo, nivel, tipo, unidad) {
   if (objetivo === 'grasa') return { series: 3, repsMin: 12, repsMax: 15 }
   return { series: 3, repsMin: 10, repsMax: 15 }
 }
+
 // ---------- Deporte ----------
 export const deporteActivo = p => !!(p.deporte && p.deporte.trim()) && Number(p.deporteDias) > 0
 
@@ -83,7 +120,7 @@ export const deporteActivo = p => !!(p.deporte && p.deporte.trim()) && Number(p.
 const PIERNAS_EXIGENTES = /futbol|rugby|basquet|basket|voley|hockey|tenis|padel|running|correr|trail|maraton|atletismo|ciclismo|bici|handball|esqui|ski/
 
 export function deporteExigePiernas(deporte = '') {
-  const t = deporte.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const t = deporte.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   return PIERNAS_EXIGENTES.test(t)
 }
 
@@ -114,13 +151,14 @@ export function generarPlan(perfil, hoy = new Date()) {
   const lib = BIBLIOTECA[lugar]
   const usados = {} // cuántas veces se usó cada patrón, para variar ejercicios entre días
   const bajarPiernas = deporteActivo(perfil) && deporteExigePiernas(perfil.deporte)
+
   const plan = {
     creadoEl: hoy.toISOString(),
     semanasCiclo: 6,
     objetivo: perfil.objetivo,
     origen: 'reglas',
     nota: armarNota(perfil, dias),
-    dias: SPLITS[dias].map((clave, i) => {
+    dias: elegirSplit(perfil.division, dias).map((clave, i) => {
       const def = DIAS[clave]
       const ejercicios = def.patrones.map((patron, j) => {
         const opciones = lib[patron]
@@ -129,7 +167,8 @@ export function generarPlan(perfil, hoy = new Date()) {
         const base = opciones[n % opciones.length]
         const esq = esquema(perfil.objetivo, perfil.nivel, base.tipo, base.unidad)
         const { repsMin, repsMax } = esq
-        const series = base.inferior && bajarPiernas ? Math.max(2, esq.series - 1) : esq.series        return {
+        const series = base.inferior && bajarPiernas ? Math.max(2, esq.series - 1) : esq.series
+        return {
           id: slug(base.nombre), // sin posición: el historial del ejercicio se conserva entre planes
           nombre: base.nombre,
           tipo: base.tipo,
@@ -145,17 +184,17 @@ export function generarPlan(perfil, hoy = new Date()) {
       return { nombre: def.nombre, ejercicios }
     }),
   }
-  // Si un día se repite en la semana (ej. 4 días: superior/inferior x2), se distingue con una letra.
+  // Si un día se repite en la semana (ej. superior/inferior x2), se distingue con una letra: B, C, D...
   const vistos = {}
   plan.dias.forEach(d => {
     vistos[d.nombre] = (vistos[d.nombre] || 0) + 1
-    if (vistos[d.nombre] > 1) d.nombre = `${d.nombre} B`
+    if (vistos[d.nombre] > 1) d.nombre = `${d.nombre} ${'ABCDEF'[vistos[d.nombre] - 1]}`
   })
   return plan
 }
 
 function slug(s) {
-  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
 
 export function diasDesde(fechaIso, hoy = new Date()) {
@@ -170,7 +209,7 @@ export function planVencido(plan, hoy = new Date()) {
 // ---------- Progresión ----------
 export const e1rm = (peso, reps) => peso * (1 + reps / 30)
 
-function incremento(ej) {
+export function incremento(ej) {
   if (ej.tipo === 'compuesto') return ej.inferior ? 5 : 2.5
   return 2
 }
