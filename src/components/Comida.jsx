@@ -6,19 +6,7 @@ import {
   ALIMENTOS, CATEGORIAS, MOMENTOS, alimentoPorId, macrosDeItems, totalesDelDia, momentoSegunHora,
   sugerirRecetas, textoCantidad, comprasDe, comprasATexto,
 } from '../lib/alimentos.js'
-
-function Barra({ label, valor, meta, unidad }) {
-  const pasado = meta > 0 && valor > meta * 1.1
-  return (
-    <div className="barra">
-      <div className="fila-sb">
-        <span>{label}</span>
-        <span className={pasado ? 'pasado' : ''}>{valor} / {meta} {unidad}</span>
-      </div>
-      <progress max={meta || 1} value={Math.min(valor, meta || 1)} />
-    </div>
-  )
-}
+import { Anillos, anillosDe } from './Graficos.jsx'
 
 function Macros({ m }) {
   return <span className="nota">{m.kcal} kcal · P {Math.round(m.p)} g · C {Math.round(m.c)} g · G {Math.round(m.g)} g</span>
@@ -333,7 +321,7 @@ export default function Comida({ estado, actualizar, irA }) {
   return (
     <div className="pantalla">
       <section className="card destacada">
-        <div className="fila-sb">
+        <div className="cabecera-metas">
           <h2>Metas de hoy</h2>
           <div className="pildoras chicas">
             <button className={tipoDia === 'entreno' ? 'activa' : ''} onClick={() => setTipoDia('entreno')}>Entreno</button>
@@ -341,10 +329,7 @@ export default function Comida({ estado, actualizar, irA }) {
             <button className={tipoDia === 'descanso' ? 'activa' : ''} onClick={() => setTipoDia('descanso')}>Descanso</button>
           </div>
         </div>
-        <Barra label="Calorías" valor={consumido.kcal} meta={metas.kcal} unidad="kcal" />
-        <Barra label="Proteína" valor={consumido.p} meta={metas.proteinaG} unidad="g" />
-        <Barra label="Carbohidratos" valor={consumido.c} meta={metas.carbosG} unidad="g" />
-        <Barra label="Grasas" valor={consumido.g} meta={metas.grasasG} unidad="g" />
+        <Anillos anillos={anillosDe(metas, consumido)} centroNumero={Math.max(0, metas.kcal - consumido.kcal)} centroTexto="kcal por comer" />
         <p className="nota">Cuenta solo lo que anotaste hoy con cantidades. Son metas orientativas, no hace falta clavarlas al gramo.</p>
       </section>
 

@@ -3,14 +3,20 @@ import {
   generarPlan, planVencido, sugerirProgresion, feedbackSesion, cumplimientoSemanal, diasDesde,
 } from '../lib/plan.js'
 import { planConIA, explicarEjercicio } from '../lib/ai.js'
+import { records as calcularRecords } from '../lib/progreso.js'
 import Explicacion from './Explicacion.jsx'
+import Descanso from './Descanso.jsx'
+import Icono from './Icono.jsx'
 import { uid } from '../lib/storage.js'
 
 const ICONO = { subir: '⬆️', mantener: '➡️', bajar: '⬇️', estancado: '⚠️', nuevo: '🆕' }
+const PAUSAS = [60, 90, 120, 180]
 
-export default function Entrenar({ estado, actualizar, irA }) {
+export default function Entrenar({ estado, actualizar, irA, entrada }) {
   const { plan, perfil, sesiones, ajustes } = estado
-  const [diaIdx, setDiaIdx] = useState(0)
+  const [diaIdx, setDiaIdx] = useState(() => (entrada && Number.isInteger(entrada.dia) ? entrada.dia : 0))
+  const [descanso, setDescanso] = useState(null) // { fin, total } mientras corre el temporizador
+  const [nuevosRecords, setNuevosRecords] = useState([])
   const [borrador, setBorrador] = useState({})
   const [feedback, setFeedback] = useState(null)
   const [cargando, setCargando] = useState(false)
@@ -29,7 +35,7 @@ export default function Entrenar({ estado, actualizar, irA }) {
 
   const crearPlanReglas = () => {
     actualizar(e => ({ ...e, plan: generarPlan(e.perfil) }))
-    setDiaIdx(0); setBorrador({}); setFeedback(null); setError('')
+    setDiaIdx(0); setBorrador({}); setFeedback(null); setNuevosRecords([]); setError('')
   }
 
   const crearPlanIA = async () => {
@@ -56,6 +62,9 @@ export default function Entrenar({ estado, actualizar, irA }) {
       setCargandoIA('')
     }
   }
+
+  const iniciarDescanso = seg => setDescanso({ fin: Date.now() + seg * 1000, total: seg })
+  const sumarDescanso = () => setDescanso(d => (d ? { fin: d.fin + 15000, total: d.total + 15 } : d))
 
   const campo = (ej, parte, valor, i) => {
     setBorrador(b => {
@@ -92,6 +101,8 @@ export default function Entrenar({ estado, actualizar, irA }) {
     const sesion = { id: uid(), fecha: new Date().toISOString(), diaNombre: dia.nombre, series }
     const todas = [...sesiones, sesion]
     const fb = feedbackSesion(plan, sesion, todas)
+    setNuevosRecords(calcularRecords(sesiones, sesion))
+    setDescanso(null)
     actualizar(e => ({
       ...e,
       sesiones: todas,
@@ -153,22 +164,32 @@ export default function Entrenar({ estado, actualizar, irA }) {
 
       <div className="pildoras">
         {plan.dias.map((d, i) => (
-          <button key={i} className={i === diaIdx ? 'activa' : ''} onClick={() => { setDiaIdx(i); setFeedback(null); setBorrador({}) }}>{d.nombre}</button>
+          <button key={i} className={i === diaIdx ? 'activa' : ''} onClick={() => { setDiaIdx(i); setFeedback(null); setNuevosRecords([]); setBorrador({}) }}>{d.nombre}</button>
         ))}
       </div>
 
-      {dia.ejercicios.map(ej => {
+      <div className="pausas">
+        <span><Icono nombre="reloj" tam={18} /> Descanso entre series</span>
+        <div className="pildoras chicas">
+          {PAUSAS.map(seg => <button key={seg} type="button" onClick={() => iniciarDescanso(seg)}>{seg >= 120 ? `${seg / 60} min` : `${seg} s`}</button>)}
+        </div>
+      </div>
+
+      {dia.ejercicios.map((ej, n) => {
         const s = sugerencias[ej.id]
         const b = borrador[ej.id] || { peso: '', reps: [], rpe: '' }
         const unidad = ej.unidad === 'seg' ? 'seg' : 'reps'
         return (
-          <section key={ej.id} className="card ejercicio">
-            <div className="fila-sb">
-              <h3>{ej.nombre}</h3>
-              <span className="chip">{ej.series} × {ej.repsMin}-{ej.repsMax} {unidad}</span>
+          <section key={ej.id} className="ejercicio">
+            <div className="ej-cabecera">
+              <span className="ej-num" aria-hidden="true">{n + 1}</span>
+              <div className="ej-titulo">
+                <h3>{ej.nombre}</h3>
+                <span className="chip">{ej.series} × {ej.repsMin}-{ej.repsMax} {unidad}</span>
+              </div>
             </div>
             <button className="enlace" onClick={() => setAbierto(abierto === ej.id ? null : ej.id)}>
-              {abierto === ej.id ? 'Ocultar explicación' : '❓ Cómo se hace'}
+              <Icono nombre="ayuda" tam={16} /> {abierto === ej.id ? 'Ocultar explicación' : 'Cómo se hace'}
             </button>
             {abierto === ej.id && (
               <Explicacion ej={ej} texto={textosIA[ej.id]} cargando={cargandoIA === ej.id} tieneIA={!!ajustes.apiKey} onPedirIA={() => pedirExplicacionIA(ej)} />
@@ -196,6 +217,16 @@ export default function Entrenar({ estado, actualizar, irA }) {
       {error && <p className="error">{error}</p>}
       <button className="primario grande" onClick={guardarSesion}>Guardar sesión</button>
 
+      {nuevosRecords.length > 0 && (
+        <section className="records" role="status">
+          <Icono nombre="trofeo" tam={26} />
+          <div>
+            <h2>{nuevosRecords.length === 1 ? 'Récord nuevo' : `${nuevosRecords.length} récords nuevos`}</h2>
+            {nuevosRecords.map((r, i) => <p key={i}>{r.ejercicio}: {r.valor} {r.unidad === 'kg' ? 'kg de fuerza estimada' : 'repeticiones'}</p>)}
+          </div>
+        </section>
+      )}
+
       {feedback && (
         <section className="card destacada">
           <h2>Cómo te fue</h2>
@@ -219,6 +250,8 @@ export default function Entrenar({ estado, actualizar, irA }) {
           ))}
         </section>
       )}
+
+      {descanso && <Descanso fin={descanso.fin} total={descanso.total} onSumar={sumarDescanso} onCerrar={() => setDescanso(null)} />}
     </div>
   )
 }
