@@ -27,6 +27,7 @@ export const estadoInicial = {
   sesiones: [],
   comidas: [],
   recetas: [],
+  elegidas: [], // recetas elegidas para la lista de compras: [{ id, factor }]
   ajustes: { apiKey: '', modelo: 'claude-sonnet-5-5' },
 }
 

@@ -151,3 +151,10 @@ button.enlace { align-self: flex-start; background: none; border: 0; padding: 0;
 .explicacion ol, .explicacion ul { margin: 0; padding-left: 20px; }
 .explicacion li { margin-bottom: 2px; }
 a.boton { display: inline-block; text-align: center; text-decoration: none; border: 1px solid var(--borde); background: var(--card); color: var(--texto); border-radius: 10px; padding: 10px 14px; }
+
+.barra { display: flex; flex-direction: column; gap: 4px; font-size: .88rem; }
+.barra .pasado { color: var(--alerta); font-weight: 600; }
+.plato { display: flex; flex-direction: column; gap: 6px; background: var(--bg); border: 1px solid var(--borde); border-radius: 10px; padding: 10px; font-size: .9rem; }
+.receta-op { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--borde); padding-top: 10px; }
+.item-compra { font-size: .92rem; color: var(--texto); padding: 3px 0; }
+.tachado { text-decoration: line-through; color: var(--suave); }
