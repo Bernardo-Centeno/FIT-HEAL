@@ -262,6 +262,14 @@ details ul { margin: 8px 0 0; padding-left: 18px; font-size: .9rem; color: var(-
 .descanso.listo .num { color: var(--verde); }
 .descanso button:not(.icono-boton) { min-height: 40px; padding: 8px 12px; }
 
+.ej-acciones { display: flex; gap: 18px; flex-wrap: wrap; }
+.ej-acciones .enlace { display: inline-flex; align-items: center; gap: 6px; }
+.fatiga { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--linea); border-left: 4px solid var(--rojo); border-radius: var(--r-medio); background: var(--superficie); }
+.fatiga.activa { border-left-color: var(--verde); }
+.cambio { display: flex; flex-direction: column; gap: 10px; background: var(--fondo); border: 1px solid var(--linea); border-radius: 12px; padding: 12px; }
+.cambio-grupo { display: flex; flex-direction: column; gap: 8px; }
+.opcion-ej { justify-content: space-between; text-align: left; width: 100%; font-weight: 600; background: var(--superficie); }
+
 /* ---------- Comida ---------- */
 .plato { display: flex; flex-direction: column; gap: 8px; background: var(--fondo); border: 1px solid var(--linea); border-radius: 12px; padding: 12px; font-size: .92rem; }
 .receta-op { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--linea); padding-top: 14px; }

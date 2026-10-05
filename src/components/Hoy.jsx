@@ -1,5 +1,5 @@
 import React from 'react'
-import { objetivosNutricion, deporteActivo, planVencido, diasDesde } from '../lib/plan.js'
+import { objetivosNutricion, deporteActivo, planVencido, diasDesde, esDePierna } from '../lib/plan.js'
 import { totalesDelDia } from '../lib/alimentos.js'
 import { proximoDia, entrenoHoy, semanaActual, rachaSemanas, minutosEstimados } from '../lib/metricas.js'
 import { Anillos, anillosDe } from './Graficos.jsx'
@@ -44,6 +44,9 @@ export default function Hoy({ estado, irA }) {
             <button className="primario grande" onClick={() => irA('entrenar', { dia: proximo.indice })}>
               <Icono nombre="entrenar" tam={20} /> Empezar entrenamiento
             </button>
+            {proximo.dia.ejercicios.some(ej => esDePierna(ej, perfil)) && (
+              <button className="enlace" onClick={() => irA('entrenar', { dia: proximo.indice, fatiga: true })}>¿Piernas cansadas? Cambiar los ejercicios de hoy</button>
+            )}
           </>
         )}
         {plan && yaEntreno && (

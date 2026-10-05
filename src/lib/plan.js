@@ -154,32 +154,17 @@ export function generarPlan(perfil, hoy = new Date()) {
 
   const plan = {
     creadoEl: hoy.toISOString(),
-    semanasCiclo: 6,
+    semanasCiclo: cicloElegido(perfil),
     objetivo: perfil.objetivo,
     origen: 'reglas',
     nota: armarNota(perfil, dias),
     dias: elegirSplit(perfil.division, dias).map((clave, i) => {
       const def = DIAS[clave]
-      const ejercicios = def.patrones.map((patron, j) => {
+      const ejercicios = def.patrones.map(patron => {
         const opciones = lib[patron]
         const n = usados[patron] || 0
         usados[patron] = n + 1
-        const base = opciones[n % opciones.length]
-        const esq = esquema(perfil.objetivo, perfil.nivel, base.tipo, base.unidad)
-        const { repsMin, repsMax } = esq
-        const series = base.inferior && bajarPiernas ? Math.max(2, esq.series - 1) : esq.series
-        return {
-          id: slug(base.nombre), // sin posición: el historial del ejercicio se conserva entre planes
-          nombre: base.nombre,
-          tipo: base.tipo,
-          unidad: base.unidad,
-          corporal: base.corporal,
-          inferior: base.inferior,
-          series,
-          repsMin,
-          repsMax,
-          pesoKg: 0, // se completa en la primera sesión: elegí un peso con el que sobren ~2 reps
-        }
+        return aEjercicio(opciones[n % opciones.length], perfil, bajarPiernas)
       })
       return { nombre: def.nombre, ejercicios }
     }),
@@ -191,6 +176,108 @@ export function generarPlan(perfil, hoy = new Date()) {
     if (vistos[d.nombre] > 1) d.nombre = `${d.nombre} ${'ABCDEF'[vistos[d.nombre] - 1]}`
   })
   return plan
+}
+
+// ---------- Ejercicio a partir de la biblioteca ----------
+function aEjercicio(base, perfil, bajarPiernas = false) {
+  const esq = esquema(perfil.objetivo, perfil.nivel, base.tipo, base.unidad)
+  const series = base.inferior && bajarPiernas ? Math.max(2, esq.series - 1) : esq.series
+  return {
+    id: slug(base.nombre), // sin posición: el historial del ejercicio se conserva entre planes
+    nombre: base.nombre,
+    tipo: base.tipo,
+    unidad: base.unidad,
+    corporal: base.corporal,
+    inferior: base.inferior,
+    series,
+    repsMin: esq.repsMin,
+    repsMax: esq.repsMax,
+    pesoKg: 0, // se completa en la primera sesión: elegí un peso con el que sobren ~2 reps
+  }
+}
+
+// ---------- Cada cuánto se renueva el plan ----------
+export const CICLOS = [
+  { semanas: 4, label: 'Cada 1 mes (4 semanas)' },
+  { semanas: 6, label: 'Cada 6 semanas' },
+  { semanas: 8, label: 'Cada 2 meses (8 semanas)' },
+  { semanas: 12, label: 'Cada 3 meses (12 semanas)' },
+]
+
+export function cicloElegido(perfil) {
+  const n = Number(perfil && perfil.cicloSemanas)
+  return CICLOS.some(c => c.semanas === n) ? n : 6
+}
+
+export function semanaDelPlan(plan, hoy = new Date()) {
+  const ciclo = plan.semanasCiclo || 6
+  return Math.min(ciclo, Math.max(1, Math.floor(diasDesde(plan.creadoEl, hoy) / 7) + 1))
+}
+
+export function fechaRenovacion(plan) {
+  const d = new Date(plan.creadoEl)
+  d.setDate(d.getDate() + (plan.semanasCiclo || 6) * 7)
+  return d
+}
+
+// ---------- Cambiar ejercicios ----------
+const PATRONES_PIERNA = ['pierna_cuad', 'bisagra', 'pierna_acc', 'isquios', 'cuadriceps_aisl', 'gemelos']
+// Alternativas que no cargan las piernas, en orden de preferencia
+const PATRONES_SIN_PIERNAS = ['tiron_h', 'empuje_h', 'hombro_post', 'core', 'biceps', 'triceps', 'hombro_lat', 'tiron_v', 'empuje_v']
+const RELACIONADOS = {
+  pierna_cuad: ['pierna_acc', 'bisagra'], bisagra: ['pierna_acc', 'pierna_cuad'], pierna_acc: ['pierna_cuad', 'bisagra'],
+  isquios: ['bisagra'], cuadriceps_aisl: ['pierna_cuad'], gemelos: [],
+  empuje_h: ['empuje_v'], empuje_v: ['empuje_h'], tiron_h: ['tiron_v'], tiron_v: ['tiron_h'],
+  hombro_lat: ['hombro_post'], hombro_post: ['hombro_lat'], biceps: ['triceps'], triceps: ['biceps'], core: [],
+}
+
+const lugarDe = perfil => (perfil.equipamiento === 'casa' ? 'casa' : 'gimnasio')
+
+export function patronDe(nombre, perfil) {
+  const lib = BIBLIOTECA[lugarDe(perfil)]
+  for (const [patron, lista] of Object.entries(lib)) {
+    if (lista.some(e => e.nombre === nombre)) return patron
+  }
+  return null
+}
+
+export function esDePierna(ej, perfil) {
+  return PATRONES_PIERNA.includes(patronDe(ej.nombre, perfil))
+}
+
+// Opciones para cambiar un ejercicio de un día: parecidos (mismo movimiento) y, si es de piernas, otros sin piernas.
+export function alternativas(ej, perfil, dia) {
+  const lib = BIBLIOTECA[lugarDe(perfil)]
+  const enDia = new Set(dia.ejercicios.map(e => e.nombre))
+  const patron = patronDe(ej.nombre, perfil)
+  const vistos = new Set()
+  const tomar = patrones => patrones
+    .flatMap(p => lib[p] || [])
+    .filter(b => !enDia.has(b.nombre) && !vistos.has(b.nombre) && (vistos.add(b.nombre), true))
+    .map(b => aEjercicio(b, perfil))
+  const parecidos = patron ? tomar([patron, ...(RELACIONADOS[patron] || [])]) : []
+  const sinPiernas = PATRONES_PIERNA.includes(patron) ? tomar(PATRONES_SIN_PIERNAS) : []
+  return { parecidos, sinPiernas }
+}
+
+// "Tengo las piernas cansadas": reemplaza cada ejercicio de piernas del día por uno que no las cargue.
+// Devuelve { [idOriginal]: ejercicioNuevo }
+export function cambiosPorFatiga(dia, perfil) {
+  const lib = BIBLIOTECA[lugarDe(perfil)]
+  const usados = new Set(dia.ejercicios.map(e => e.nombre))
+  const cambios = {}
+  for (const ej of dia.ejercicios) {
+    if (!esDePierna(ej, perfil)) continue
+    for (const p of PATRONES_SIN_PIERNAS) {
+      const base = (lib[p] || []).find(b => !usados.has(b.nombre))
+      if (base) {
+        usados.add(base.nombre)
+        cambios[ej.id] = aEjercicio(base, perfil)
+        break
+      }
+    }
+  }
+  return cambios
 }
 
 function slug(s) {
@@ -284,11 +371,13 @@ export function sugerirProgresion(ej, sesiones) {
 }
 
 // Feedback de una sesión recién guardada: un mensaje por ejercicio entrenado.
-export function feedbackSesion(plan, sesion, sesiones) {
+// ejerciciosDelDia (opcional): la lista que se usó de verdad hoy, por si cambiaste algún ejercicio solo por esa sesión.
+export function feedbackSesion(plan, sesion, sesiones, ejerciciosDelDia = null) {
   if (!plan) return []
   const dia = plan.dias.find(d => d.nombre === sesion.diaNombre)
-  if (!dia) return []
-  return dia.ejercicios
+  const lista = ejerciciosDelDia || (dia ? dia.ejercicios : null)
+  if (!lista) return []
+  return lista
     .filter(ej => sesion.series.some(s => s.ejercicioId === ej.id))
     .map(ej => ({ ejercicio: ej.nombre, ...sugerirProgresion(ej, sesiones) }))
 }

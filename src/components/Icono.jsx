@@ -16,6 +16,7 @@ const FORMAS = {
   trofeo: <path d="M8 4h8v5a4 4 0 0 1-8 0V4zM8 6H5v1a3 3 0 0 0 3 3M16 6h3v1a3 3 0 0 1-3 3M12 13v4M9 20h6M10 17h4" />,
   ayuda: (<><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01" /></>),
   atras: <path d="M15 5l-7 7 7 7" />,
+  cambiar: <path d="M4 8h13l-3-3M20 16H7l3 3" />,
 }
 
 export default function Icono({ nombre, tam = 22 }) {
