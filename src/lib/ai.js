@@ -166,3 +166,17 @@ export async function explicarEjercicio({ ajustes, perfil, ejercicio }) {
 Explicame cómo hacer el ejercicio "${ejercicio.nombre}" (${ejercicio.series} series de ${ejercicio.repsMin}-${ejercicio.repsMax} ${unidad}). Incluí: qué músculos trabaja, los pasos de la técnica (3 a 5), 2 errores comunes y una alternativa más fácil por si me cuesta. Tené en cuenta mis lesiones y mi nivel. Sé breve y respondé en texto plano, sin tablas.`
   return llamar({ apiKey: ajustes.apiKey, modelo: ajustes.modelo, system: BASE, content: text, maxTokens: 700 })
 }
+
+// Estima los valores de un alimento por cada 100 g. Devuelve { nombre, kcal, p, c, g, porcionG } (aproximados).
+export async function estimarAlimento({ ajustes, texto }) {
+  const respuesta = await llamar({
+    apiKey: ajustes.apiKey, modelo: ajustes.modelo, maxTokens: 300,
+    system: 'Sos un nutricionista argentino. Estimás valores nutricionales por cada 100 g de un alimento, tal como se come. Respondé SOLO un JSON, sin texto extra, con esta forma: {"nombre":"...","kcal":0,"p":0,"c":0,"g":0,"porcionG":0}. p, c y g son gramos de proteína, carbohidratos y grasas por 100 g. porcionG es el peso en gramos de una unidad o porción típica (0 si no aplica).',
+    content: `Alimento: ${texto}`,
+  })
+  const m = respuesta.match(/\{[\s\S]*\}/)
+  if (!m) throw new ErrorIA('No pude interpretar la respuesta. Probá de nuevo.')
+  let d
+  try { d = JSON.parse(m[0]) } catch { throw new ErrorIA('No pude interpretar la respuesta. Probá de nuevo.') }
+  return { nombre: String(d.nombre || texto), kcal: Number(d.kcal), p: Number(d.p) || 0, c: Number(d.c) || 0, g: Number(d.g) || 0, porcionG: Number(d.porcionG) || 0 }
+}

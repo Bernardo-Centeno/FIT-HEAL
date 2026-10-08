@@ -30,6 +30,7 @@ export const estadoInicial = {
   comidas: [],
   recetas: [],
   hoyCambios: null, // cambios solo por hoy: { fecha, sust: { 'Día|idOriginal': ejercicio }, quitados: ['Día|id'], extras: { 'Día': [ejercicio] } }
+  alimentosPropios: [], // alimentos que cargaste vos: [{ id, nombre, kcal, p, c, g, unidad }] (valores cada 100 g)
   elegidas: [], // recetas elegidas para la lista de compras: [{ id, factor }]
   ajustes: { apiKey: '', modelo: 'claude-sonnet-5-5' },
 }

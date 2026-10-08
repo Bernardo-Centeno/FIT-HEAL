@@ -4,10 +4,11 @@ import { feedbackComida, sugerirComidaYReceta, listaDeCompras, reducirImagen } f
 import { uid } from '../lib/storage.js'
 import {
   ALIMENTOS, CATEGORIAS, MOMENTOS, alimentoPorId, macrosDeItems, totalesDelDia, momentoSegunHora,
-  sugerirRecetas, textoCantidad, comprasDe, comprasATexto,
+  sugerirRecetas, textoCantidad, comprasDe, comprasATexto, registrarPropios, buscarAlimentos, CAT_PROPIOS,
 } from '../lib/alimentos.js'
 import { Anillos, anillosDe } from './Graficos.jsx'
 import EditorComida from './EditorComida.jsx'
+import NuevoAlimento from './NuevoAlimento.jsx'
 
 function Macros({ m }) {
   return <span className="nota">{m.kcal} kcal · P {Math.round(m.p)} g · C {Math.round(m.c)} g · G {Math.round(m.g)} g</span>
@@ -15,7 +16,9 @@ function Macros({ m }) {
 
 // ---------- Registrar lo que comiste (sin IA) ----------
 
-function Registrar({ actualizar }) {
+function Registrar({ actualizar, propios, ajustes }) {
+  const [buscar, setBuscar] = useState('')
+  const [agregando, setAgregando] = useState(false)
   const [alimentoId, setAlimentoId] = useState('')
   const [cantidad, setCantidad] = useState('')
   const [modo, setModo] = useState('g')
@@ -26,6 +29,12 @@ function Registrar({ actualizar }) {
   const macros = macrosDeItems(plato)
 
   const elegir = id => { setAlimentoId(id); setModo('g'); setError('') }
+  const encontrados = buscarAlimentos(buscar, propios)
+  const guardarPropio = a => {
+    actualizar(e => ({ ...e, alimentosPropios: [...(e.alimentosPropios || []), a] }))
+    registrarPropios([a])
+    elegir(a.id); setAgregando(false); setBuscar('')
+  }
 
   const agregar = () => {
     if (!alimento) { setError('Elegí un alimento.'); return }
@@ -50,6 +59,22 @@ function Registrar({ actualizar }) {
     <section className="card">
       <h2>Anotar lo que comí</h2>
       <p className="nota">Elegí el alimento y la cantidad. Los valores son aproximados (carnes, arroz, fideos y legumbres secas, en crudo).</p>
+      <label>Buscar
+        <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Ej: leche descremada, alfajor, milanesa" />
+      </label>
+      {buscar.trim() !== '' && (
+        <div className="cambio-grupo">
+          {encontrados.map(a => (
+            <button key={a.id} type="button" className="opcion-ej" onClick={() => { elegir(a.id); setBuscar('') }}>
+              <span>{a.nombre}</span><span className="chip">{a.kcal} kcal / 100 g</span>
+            </button>
+          ))}
+          {encontrados.length === 0 && <p className="nota">No lo tengo en la lista.</p>}
+          {!agregando && <button type="button" className="enlace" onClick={() => setAgregando(true)}>Agregar "{buscar.trim()}" a mis alimentos</button>}
+        </div>
+      )}
+      {agregando && <NuevoAlimento textoInicial={buscar.trim()} ajustes={ajustes} onGuardar={guardarPropio} onCerrar={() => setAgregando(false)} />}
+      {!agregando && buscar.trim() === '' && <button type="button" className="enlace" onClick={() => setAgregando(true)}>¿No está? Agregá un alimento</button>}
       <label>Alimento
         <select value={alimentoId} onChange={e => elegir(e.target.value)}>
           <option value="">Elegí uno…</option>
@@ -58,6 +83,11 @@ function Registrar({ actualizar }) {
               {ALIMENTOS.filter(a => a.cat === cat).map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
             </optgroup>
           ))}
+          {propios.length > 0 && (
+            <optgroup label={CAT_PROPIOS}>
+              {propios.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+            </optgroup>
+          )}
         </select>
       </label>
       <div className="fila">
@@ -311,6 +341,9 @@ export default function Comida({ estado, actualizar, irA }) {
   const { perfil, comidas, recetas } = estado
   const elegidas = estado.elegidas || []
 
+  const propios = estado.alimentosPropios || []
+  registrarPropios(propios)
+
   const hoy = new Date().toDateString()
   const entrenoHoy = estado.sesiones.some(s => new Date(s.fecha).toDateString() === hoy)
   const [tipoDia, setTipoDia] = useState(entrenoHoy ? 'entreno' : 'descanso') // entreno | deporte | descanso
@@ -336,7 +369,7 @@ export default function Comida({ estado, actualizar, irA }) {
         <p className="nota">Cuenta solo lo que anotaste hoy con cantidades. Son metas orientativas, no hace falta clavarlas al gramo.</p>
       </section>
 
-      <Registrar actualizar={actualizar} />
+      <Registrar actualizar={actualizar} propios={propios} ajustes={estado.ajustes} />
       <QueComo perfil={perfil} metas={metas} elegidas={elegidas} actualizar={actualizar} />
       <Compras elegidas={elegidas} actualizar={actualizar} />
       <ConIA estado={estado} actualizar={actualizar} metas={metas} irA={irA} tipoDia={tipoDia} />

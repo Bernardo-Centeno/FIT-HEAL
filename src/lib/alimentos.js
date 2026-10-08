@@ -4,6 +4,7 @@
 const A = (id, nombre, cat, kcal, p, c, g, tags = [], unidad = null) => ({ id, nombre, cat, kcal, p, c, g, tags, unidad })
 
 export const CATEGORIAS = ['Carnes y pescados', 'Lácteos y huevos', 'Verduras y frutas', 'Almacén', 'Otros']
+export const CAT_PROPIOS = 'Mis alimentos'
 
 export const ALIMENTOS = [
   // Carnes y pescados
@@ -53,10 +54,131 @@ export const ALIMENTOS = [
   A('nueces', 'Nueces', 'Almacén', 650, 15, 14, 65, ['frutos_secos']),
   A('miel', 'Miel', 'Almacén', 300, 0.3, 82, 0),
   A('proteina-whey', 'Proteína en polvo (whey)', 'Otros', 380, 78, 8, 6, ['lacteo']),
+  // --- Más carnes y pescados
+  A('milanesa-de-carne', 'Milanesa de carne (al horno)', 'Carnes y pescados', 220, 20, 12, 10, ['carne', 'vacuna', 'gluten', 'huevo'], { g: 120, uno: 'milanesa', varios: 'milanesas' }),
+  A('milanesa-de-pollo', 'Milanesa de pollo (al horno)', 'Carnes y pescados', 200, 19, 12, 8, ['pollo', 'ave', 'gluten', 'huevo'], { g: 120, uno: 'milanesa', varios: 'milanesas' }),
+  A('asado', 'Asado de tira (cocido)', 'Carnes y pescados', 290, 25, 0, 21, ['carne', 'vacuna']),
+  A('bife-de-chorizo', 'Bife de chorizo (cocido)', 'Carnes y pescados', 250, 27, 0, 15, ['carne', 'vacuna']),
+  A('muslo-de-pollo', 'Muslo de pollo sin piel (crudo)', 'Carnes y pescados', 125, 20, 0, 5, ['pollo', 'ave']),
+  A('bondiola-de-cerdo', 'Bondiola de cerdo (cruda)', 'Carnes y pescados', 230, 18, 0, 17, ['cerdo']),
+  A('chorizo', 'Chorizo (cocido)', 'Carnes y pescados', 320, 16, 2, 28, ['cerdo', 'carne'], { g: 90, uno: 'chorizo', varios: 'chorizos' }),
+  A('hamburguesa-casera', 'Hamburguesa de carne (cocida)', 'Carnes y pescados', 250, 24, 0, 17, ['carne', 'vacuna'], { g: 110, uno: 'hamburguesa', varios: 'hamburguesas' }),
+  A('salchicha', 'Salchicha de viena', 'Carnes y pescados', 280, 11, 3, 25, ['cerdo', 'carne'], { g: 40, uno: 'salchicha', varios: 'salchichas' }),
+  A('sardinas-en-lata', 'Sardinas en lata (escurridas)', 'Carnes y pescados', 190, 24, 0, 10, ['pescado']),
+  // --- Más lácteos y huevos
+  A('leche-descremada', 'Leche descremada', 'Lácteos y huevos', 35, 3.4, 5, 0.1, ['lacteo']),
+  A('leche-sin-lactosa', 'Leche sin lactosa (entera)', 'Lácteos y huevos', 62, 3.2, 4.8, 3.3, []),
+  A('yogur-descremado', 'Yogur descremado', 'Lácteos y huevos', 40, 3.5, 5.5, 0.2, ['lacteo']),
+  A('yogur-bebible', 'Yogur bebible', 'Lácteos y huevos', 75, 2.8, 12, 1.8, ['lacteo']),
+  A('queso-port-salut', 'Queso Port Salut', 'Lácteos y huevos', 330, 22, 1, 26, ['lacteo']),
+  A('queso-rallado', 'Queso rallado', 'Lácteos y huevos', 390, 30, 2, 29, ['lacteo']),
+  A('queso-untable-light', 'Queso untable light', 'Lácteos y huevos', 150, 9, 5, 10, ['lacteo']),
+  A('muzzarella', 'Muzzarella', 'Lácteos y huevos', 280, 22, 2, 21, ['lacteo']),
+  A('dulce-de-leche', 'Dulce de leche', 'Lácteos y huevos', 320, 6, 56, 7, ['lacteo']),
+  A('crema-de-leche', 'Crema de leche', 'Lácteos y huevos', 340, 2, 3, 35, ['lacteo']),
+  A('clara-de-huevo', 'Clara de huevo', 'Lácteos y huevos', 52, 11, 0.7, 0.2, ['huevo'], { g: 33, uno: 'clara', varios: 'claras' }),
+  // --- Más verduras y frutas
+  A('pera', 'Pera', 'Verduras y frutas', 57, 0.4, 15, 0.1, [], { g: 170, uno: 'pera', varios: 'peras' }),
+  A('mandarina', 'Mandarina', 'Verduras y frutas', 53, 0.8, 13, 0.3, [], { g: 90, uno: 'mandarina', varios: 'mandarinas' }),
+  A('durazno', 'Durazno', 'Verduras y frutas', 39, 0.9, 10, 0.3, [], { g: 150, uno: 'durazno', varios: 'duraznos' }),
+  A('uvas', 'Uvas', 'Verduras y frutas', 69, 0.7, 18, 0.2),
+  A('sandia', 'Sandía', 'Verduras y frutas', 30, 0.6, 7.5, 0.2),
+  A('melon', 'Melón', 'Verduras y frutas', 34, 0.8, 8, 0.2),
+  A('anana', 'Ananá', 'Verduras y frutas', 50, 0.5, 13, 0.1),
+  A('kiwi', 'Kiwi', 'Verduras y frutas', 61, 1.1, 15, 0.5, [], { g: 75, uno: 'kiwi', varios: 'kiwis' }),
+  A('arandanos', 'Arándanos', 'Verduras y frutas', 57, 0.7, 14, 0.3),
+  A('limon', 'Limón', 'Verduras y frutas', 29, 1.1, 9, 0.3),
+  A('pepino', 'Pepino', 'Verduras y frutas', 15, 0.7, 3.6, 0.1),
+  A('coliflor', 'Coliflor', 'Verduras y frutas', 25, 1.9, 5, 0.3),
+  A('berenjena', 'Berenjena', 'Verduras y frutas', 25, 1, 6, 0.2),
+  A('choclo', 'Choclo (maíz)', 'Verduras y frutas', 86, 3.3, 19, 1.4),
+  A('arvejas', 'Arvejas', 'Verduras y frutas', 81, 5.4, 14, 0.4),
+  A('remolacha', 'Remolacha', 'Verduras y frutas', 43, 1.6, 10, 0.2),
+  A('acelga', 'Acelga', 'Verduras y frutas', 19, 1.8, 3.7, 0.2),
+  A('champignones', 'Champiñones', 'Verduras y frutas', 22, 3.1, 3.3, 0.3),
+  // --- Más almacén
+  A('arroz-cocido', 'Arroz cocido', 'Almacén', 130, 2.7, 28, 0.3),
+  A('fideos-cocidos', 'Fideos cocidos', 'Almacén', 140, 5, 28, 0.8, ['gluten']),
+  A('pan-integral', 'Pan integral', 'Almacén', 250, 11, 45, 3.5, ['gluten'], { g: 40, uno: 'rebanada', varios: 'rebanadas' }),
+  A('pan-de-hamburguesa', 'Pan de hamburguesa', 'Almacén', 280, 9, 50, 4, ['gluten'], { g: 60, uno: 'pan', varios: 'panes' }),
+  A('tostadas', 'Tostadas de pan', 'Almacén', 390, 11, 72, 6, ['gluten'], { g: 8, uno: 'tostada', varios: 'tostadas' }),
+  A('galletitas-de-agua', 'Galletitas de agua', 'Almacén', 420, 10, 72, 10, ['gluten'], { g: 6, uno: 'galletita', varios: 'galletitas' }),
+  A('galletitas-dulces', 'Galletitas dulces', 'Almacén', 470, 6, 70, 18, ['gluten'], { g: 10, uno: 'galletita', varios: 'galletitas' }),
+  A('cereales-azucarados', 'Cereales de desayuno', 'Almacén', 380, 7, 80, 2.5, ['gluten']),
+  A('granola', 'Granola', 'Almacén', 430, 10, 65, 15, ['gluten', 'frutos_secos']),
+  A('harina-de-trigo', 'Harina de trigo', 'Almacén', 360, 10, 76, 1, ['gluten']),
+  A('papas-fritas-bolsa', 'Papas fritas de bolsa', 'Almacén', 540, 6, 52, 34, []),
+  A('porotos', 'Porotos negros cocidos', 'Almacén', 130, 8.5, 23, 0.5, ['legumbres']),
+  A('almendras', 'Almendras', 'Almacén', 580, 21, 22, 50, ['frutos_secos']),
+  A('mani', 'Maní (pelado)', 'Almacén', 570, 26, 16, 49, ['mani', 'frutos_secos']),
+  A('semillas-de-chia', 'Semillas de chía', 'Almacén', 490, 17, 42, 31, []),
+  A('aceite-girasol', 'Aceite de girasol', 'Almacén', 884, 0, 0, 100),
+  A('manteca', 'Manteca', 'Almacén', 717, 0.9, 0.1, 81, ['lacteo']),
+  A('mayonesa', 'Mayonesa', 'Almacén', 680, 1, 3, 75, ['huevo']),
+  A('azucar', 'Azúcar', 'Almacén', 390, 0, 100, 0),
+  // --- Otros (dulces, bebidas, comida armada)
+  A('alfajor-chocolate', 'Alfajor de chocolate', 'Otros', 430, 4, 62, 19, ['gluten', 'lacteo'], { g: 55, uno: 'alfajor', varios: 'alfajores' }),
+  A('alfajor-triple', 'Alfajor triple', 'Otros', 420, 4.5, 60, 18, ['gluten', 'lacteo'], { g: 70, uno: 'alfajor', varios: 'alfajores' }),
+  A('chocolate-con-leche', 'Chocolate con leche', 'Otros', 535, 7.5, 58, 30, ['lacteo'], { g: 6, uno: 'cuadradito', varios: 'cuadraditos' }),
+  A('chocolate-amargo', 'Chocolate amargo 70%', 'Otros', 580, 8, 40, 42, [], { g: 6, uno: 'cuadradito', varios: 'cuadraditos' }),
+  A('helado-crema', 'Helado de crema', 'Otros', 210, 3.5, 24, 11, ['lacteo']),
+  A('medialuna', 'Medialuna de manteca', 'Otros', 400, 8, 45, 21, ['gluten', 'lacteo'], { g: 55, uno: 'medialuna', varios: 'medialunas' }),
+  A('pizza-muzzarella', 'Pizza de muzzarella', 'Otros', 270, 11, 33, 10, ['gluten', 'lacteo'], { g: 100, uno: 'porción', varios: 'porciones' }),
+  A('empanada-de-carne', 'Empanada de carne (al horno)', 'Otros', 250, 10, 26, 12, ['gluten', 'carne'], { g: 90, uno: 'empanada', varios: 'empanadas' }),
+  A('gaseosa', 'Gaseosa común', 'Otros', 42, 0, 10.5, 0),
+  A('jugo-de-naranja', 'Jugo de naranja (exprimido)', 'Otros', 45, 0.7, 10, 0.2),
+  A('cerveza', 'Cerveza', 'Otros', 43, 0.5, 3.6, 0),
+  A('vino-tinto', 'Vino tinto', 'Otros', 85, 0.1, 2.6, 0),
+  A('cafe-con-leche', 'Café con leche (taza)', 'Otros', 30, 1.7, 2.4, 1.6, ['lacteo']),
+  A('mate-cocido-con-azucar', 'Mate cocido con azúcar', 'Otros', 20, 0, 5, 0),
+  A('barra-de-cereal', 'Barra de cereal', 'Otros', 390, 5, 70, 10, ['gluten'], { g: 25, uno: 'barra', varios: 'barras' }),
+  A('barra-de-proteina', 'Barra de proteína', 'Otros', 370, 33, 35, 12, ['lacteo'], { g: 50, uno: 'barra', varios: 'barras' }),
+  A('creatina', 'Creatina (polvo)', 'Otros', 0, 0, 0, 0),
 ]
 
 const POR_ID = Object.fromEntries(ALIMENTOS.map(a => [a.id, a]))
 export const alimentoPorId = id => POR_ID[id] || null
+
+// Alimentos que cargó la persona (a mano, de Open Food Facts o estimados con IA).
+// Se registran acá para que macrosDeItems y textoCantidad los encuentren igual que a los de fábrica.
+export function registrarPropios(lista) {
+  for (const a of lista || []) {
+    if (a && a.id && !POR_ID[a.id]) POR_ID[a.id] = a
+  }
+}
+
+const normal = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+
+// Busca por nombre (sin tildes ni mayúsculas) en alimentos de fábrica + propios. Cada palabra tiene que aparecer.
+export function buscarAlimentos(texto, propios = [], limite = 8) {
+  const palabras = normal(texto).split(/\s+/).filter(Boolean)
+  if (palabras.length === 0) return []
+  const lista = [...(propios || []), ...ALIMENTOS]
+  const puntuar = a => {
+    const n = normal(a.nombre)
+    if (!palabras.every(w => n.includes(w))) return -1
+    return n.startsWith(palabras[0]) ? 2 : 1
+  }
+  return lista.map(a => ({ a, s: puntuar(a) })).filter(x => x.s > 0).sort((x, y) => y.s - x.s).map(x => x.a).slice(0, limite)
+}
+
+// Valida y arma un alimento propio. Valores por cada 100 g. Devuelve { alimento } o { error }.
+export function alimentoPropio({ nombre, kcal, p, c, g, unidadG, unidadNombre }, idExistente = null) {
+  const n = String(nombre || '').trim()
+  if (n.length < 2) return { error: 'Poné el nombre del alimento.' }
+  const v = { kcal: Number(kcal), p: Number(p) || 0, c: Number(c) || 0, g: Number(g) || 0 }
+  if (!(v.kcal >= 0) || kcal === '' || kcal == null) return { error: 'Poné las calorías cada 100 g (si no sabés, 0 solo para agua o similares).' }
+  if (v.kcal > 900) return { error: 'Las calorías cada 100 g no pueden superar 900. Revisá el valor.' }
+  if (v.p < 0 || v.c < 0 || v.g < 0 || v.p + v.c + v.g > 100.5) return { error: 'Proteína + carbohidratos + grasas no pueden superar 100 g cada 100 g.' }
+  let unidad = null
+  const ug = Number(unidadG)
+  if (ug > 0) {
+    const un = String(unidadNombre || '').trim() || 'unidad'
+    unidad = { g: ug, uno: un, varios: un.endsWith('s') ? un : un + 's' }
+  }
+  const id = idExistente || 'p-' + normal(n).replace(/[^a-z0-9]+/g, '-').slice(0, 24) + '-' + Math.random().toString(36).slice(2, 6)
+  return { alimento: { id, nombre: n, cat: CAT_PROPIOS, kcal: Math.round(v.kcal), p: Math.round(v.p * 10) / 10, c: Math.round(v.c * 10) / 10, g: Math.round(v.g * 10) / 10, tags: [], unidad, propio: true } }
+}
 
 export const MOMENTOS = [
   { id: 'desayuno', label: 'Desayuno', parte: 0.25 },
