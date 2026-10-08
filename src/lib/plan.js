@@ -126,6 +126,10 @@ export function deporteExigePiernas(deporte = '') {
 
 function armarNota(perfil, diasGym) {
   const notas = []
+  const zonas = zonasActivas(perfil)
+  if (zonas.length) {
+    notas.push(`No entrenás: ${zonas.map(z => z.toLowerCase()).join(', ')}. Esos ejercicios se reemplazaron por otros de las demás zonas.`)
+  }
   if (perfil.lesiones && perfil.lesiones.trim()) {
     notas.push('Cargaste lesiones o limitaciones. Este plan automático NO las tiene en cuenta: revisalo con un profesional antes de empezar.')
   }
@@ -151,6 +155,7 @@ export function generarPlan(perfil, hoy = new Date()) {
   const lib = BIBLIOTECA[lugar]
   const usados = {} // cuántas veces se usó cada patrón, para variar ejercicios entre días
   const bajarPiernas = deporteActivo(perfil) && deporteExigePiernas(perfil.deporte)
+  const excluidos = patronesExcluidos(perfil)
 
   const plan = {
     creadoEl: hoy.toISOString(),
@@ -160,12 +165,36 @@ export function generarPlan(perfil, hoy = new Date()) {
     nota: armarNota(perfil, dias),
     dias: elegirSplit(perfil.division, dias).map((clave, i) => {
       const def = DIAS[clave]
-      const ejercicios = def.patrones.map(patron => {
-        const opciones = lib[patron]
-        const n = usados[patron] || 0
-        usados[patron] = n + 1
-        return aEjercicio(opciones[n % opciones.length], perfil, bajarPiernas)
-      })
+      const enDia = new Set()
+      const usoDia = {} // cuántos ejercicios de cada patrón lleva este día
+      const ejercicios = []
+      for (const patron of def.patrones) {
+        let base = null
+        if (!excluidos.includes(patron)) {
+          const opciones = lib[patron]
+          const n = usados[patron] || 0
+          usados[patron] = n + 1
+          for (let k = 0; k < opciones.length && !base; k++) {
+            const c = opciones[(n + k) % opciones.length]
+            if (!enDia.has(c.nombre)) base = c // si ya está en el día (por un reemplazo), prueba la siguiente opción
+          }
+          usoDia[patron] = (usoDia[patron] || 0) + 1
+        } else {
+          // Zona que no querés entrenar: se reemplaza por la zona (de las que sí) menos usada ese día
+          let mejor = null
+          for (const cand of PATRONES_SIN_PIERNAS.concat(['pierna_cuad', 'pierna_acc', 'bisagra'])) {
+            if (excluidos.includes(cand)) continue
+            const b = lib[cand].find(x => !enDia.has(x.nombre))
+            if (!b) continue
+            const uso = usoDia[cand] || 0
+            if (!mejor || uso < mejor.uso) mejor = { cand, b, uso }
+          }
+          if (mejor) { base = mejor.b; usoDia[mejor.cand] = mejor.uso + 1 }
+        }
+        if (!base || enDia.has(base.nombre)) continue
+        enDia.add(base.nombre)
+        ejercicios.push(aEjercicio(base, perfil, bajarPiernas))
+      }
       return { nombre: def.nombre, ejercicios }
     }),
   }
@@ -278,6 +307,71 @@ export function cambiosPorFatiga(dia, perfil) {
     }
   }
   return cambios
+}
+
+// ---------- Zonas del cuerpo (para excluir, agregar o buscar ejercicios) ----------
+export const GRUPOS = {
+  Pecho: ['empuje_h'],
+  Espalda: ['tiron_h', 'tiron_v'],
+  Hombros: ['empuje_v', 'hombro_lat', 'hombro_post'],
+  Bíceps: ['biceps'],
+  Tríceps: ['triceps'],
+  Piernas: PATRONES_PIERNA,
+  Core: ['core'],
+}
+
+export function zonasActivas(perfil) {
+  const z = Array.isArray(perfil && perfil.zonasExcluidas) ? perfil.zonasExcluidas : []
+  return Object.keys(GRUPOS).filter(g => z.includes(g))
+}
+
+function patronesExcluidos(perfil) {
+  const zonas = zonasActivas(perfil)
+  // si se excluyera todo, no se excluye nada
+  if (zonas.length >= Object.keys(GRUPOS).length - 1) return []
+  return zonas.flatMap(g => GRUPOS[g])
+}
+
+// Ejercicios de la biblioteca agrupados por zona, sin los que ya están en el día
+export function catalogo(perfil, dia) {
+  const lib = BIBLIOTECA[lugarDe(perfil)]
+  const enDia = new Set(dia.ejercicios.map(e => e.nombre))
+  const salida = []
+  for (const [grupo, patrones] of Object.entries(GRUPOS)) {
+    const vistos = new Set()
+    const ejercicios = patrones
+      .flatMap(p => lib[p] || [])
+      .filter(b => !enDia.has(b.nombre) && !vistos.has(b.nombre) && (vistos.add(b.nombre), true))
+      .map(b => aEjercicio(b, perfil))
+    if (ejercicios.length) salida.push({ grupo, ejercicios })
+  }
+  return salida
+}
+
+// Ejercicio escrito por la persona. Devuelve { ejercicio } o { error }.
+export function ejercicioPropio({ nombre, series = 3, repsMin = 8, repsMax = 12, corporal = false, unidad = 'reps' }, dia = null) {
+  const limpio = String(nombre || '').trim().replace(/\s+/g, ' ')
+  if (limpio.length < 2) return { error: 'Escribí el nombre del ejercicio.' }
+  const s = Number(series), a = Number(repsMin), b = Number(repsMax)
+  if (!(s >= 1 && s <= 10)) return { error: 'Las series tienen que ser entre 1 y 10.' }
+  if (!(a >= 1 && b >= a && b <= 100)) return { error: 'Revisá el rango de repeticiones: el mínimo no puede superar al máximo.' }
+  const nombreFinal = limpio.charAt(0).toUpperCase() + limpio.slice(1)
+  if (dia && dia.ejercicios.some(e => e.nombre.toLowerCase() === nombreFinal.toLowerCase())) {
+    return { error: 'Ese ejercicio ya está en este día.' }
+  }
+  return {
+    ejercicio: {
+      id: slug(nombreFinal), nombre: nombreFinal, tipo: 'aislamiento', unidad: unidad === 'seg' ? 'seg' : 'reps',
+      corporal: !!corporal, inferior: false, series: s, repsMin: a, repsMax: b, pesoKg: 0, propio: true,
+    },
+  }
+}
+
+// Qué poner cuando se quita un ejercicio: si era de piernas, uno de tren superior; si no, uno parecido.
+export function reemplazoAutomatico(ej, perfil, dia) {
+  const alt = alternativas(ej, perfil, dia)
+  const lista = esDePierna(ej, perfil) ? alt.sinPiernas : alt.parecidos
+  return lista[0] || alt.parecidos[0] || alt.sinPiernas[0] || null
 }
 
 function slug(s) {

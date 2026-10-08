@@ -7,6 +7,7 @@ import {
   sugerirRecetas, textoCantidad, comprasDe, comprasATexto,
 } from '../lib/alimentos.js'
 import { Anillos, anillosDe } from './Graficos.jsx'
+import EditorComida from './EditorComida.jsx'
 
 function Macros({ m }) {
   return <span className="nota">{m.kcal} kcal · P {Math.round(m.p)} g · C {Math.round(m.c)} g · G {Math.round(m.g)} g</span>
@@ -316,7 +317,9 @@ export default function Comida({ estado, actualizar, irA }) {
   const metas = objetivosNutricion(perfil, tipoDia)
   const consumido = totalesDelDia(comidas)
 
+  const [editando, setEditando] = useState(null)
   const borrar = id => actualizar(e => ({ ...e, comidas: e.comidas.filter(c => c.id !== id) }))
+  const guardarComida = nueva => { actualizar(e => ({ ...e, comidas: e.comidas.map(c => (c.id === nueva.id ? nueva : c)) })); setEditando(null) }
 
   return (
     <div className="pantalla">
@@ -346,7 +349,14 @@ export default function Comida({ estado, actualizar, irA }) {
               <summary>{new Date(c.fecha).toLocaleDateString('es-AR')} · {c.descripcion.slice(0, 60)}{c.kcal ? ` · ${c.kcal} kcal` : ''}</summary>
               {c.kcal ? <Macros m={c} /> : null}
               {c.feedback ? <div className="respuesta">{c.feedback}</div> : null}
-              <button className="enlace" onClick={() => borrar(c.id)}>Borrar esta comida</button>
+              {editando === c.id ? (
+                <EditorComida comida={c} onGuardar={guardarComida} onCerrar={() => setEditando(null)} />
+              ) : (
+                <div className="fila">
+                  <button className="enlace" onClick={() => setEditando(c.id)}>Editar esta comida</button>
+                  <button className="enlace" onClick={() => borrar(c.id)}>Borrar esta comida</button>
+                </div>
+              )}
             </details>
           ))}
         </section>

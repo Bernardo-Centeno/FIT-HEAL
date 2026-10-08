@@ -1,5 +1,5 @@
 import React from 'react'
-import { objetivosNutricion, DIVISIONES } from '../lib/plan.js'
+import { objetivosNutricion, DIVISIONES, GRUPOS } from '../lib/plan.js'
 
 export default function Perfil({ estado, actualizar, irA }) {
   const p = estado.perfil
@@ -10,6 +10,8 @@ export default function Perfil({ estado, actualizar, irA }) {
   const entreno = objetivosNutricion(p, true)
   const descanso = objetivosNutricion(p, false)
   const division = DIVISIONES[p.division] || DIVISIONES.auto
+  const excluidas = p.zonasExcluidas || []
+  const alternarZona = z => set('zonasExcluidas', excluidas.includes(z) ? excluidas.filter(x => x !== z) : [...excluidas, z])
 
   return (
     <div className="pantalla">
@@ -70,6 +72,15 @@ export default function Perfil({ estado, actualizar, irA }) {
           <p className="aviso">Esta división no está disponible para {p.diasPorSemana} días. Se va a usar la automática.</p>
         )}
         <p className="nota">{division.descripcion}</p>
+        <fieldset className="zonas">
+          <legend>Zonas que no querés entrenar</legend>
+          <div className="pildoras chicas" role="group">
+            {Object.keys(GRUPOS).map(z => (
+              <button key={z} type="button" aria-pressed={excluidas.includes(z)} className={excluidas.includes(z) ? 'activa' : ''} onClick={() => alternarZona(z)}>{z}</button>
+            ))}
+          </div>
+          <p className="nota">{excluidas.length ? 'Al renovar el plan, esos ejercicios se reemplazan por otros de las zonas que sí entrenás.' : 'Si no querés trabajar una zona, marcala y el plan la reemplaza por otra.'}</p>
+        </fieldset>
         <label>Lesiones o limitaciones
           <textarea rows={2} value={p.lesiones} onChange={txt('lesiones')} placeholder="Ej: molestia en el hombro derecho" />
         </label>

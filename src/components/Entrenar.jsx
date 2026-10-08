@@ -1,45 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   generarPlan, planVencido, sugerirProgresion, feedbackSesion, cumplimientoSemanal, diasDesde,
-  alternativas, cambiosPorFatiga, esDePierna, CICLOS, semanaDelPlan, fechaRenovacion,
+  alternativas, cambiosPorFatiga, esDePierna, reemplazoAutomatico, CICLOS, semanaDelPlan, fechaRenovacion,
 } from '../lib/plan.js'
 import { planConIA, explicarEjercicio } from '../lib/ai.js'
 import { records as calcularRecords } from '../lib/metricas.js'
 import Explicacion from './Explicacion.jsx'
 import Descanso from './Descanso.jsx'
+import EditorSesion from './EditorSesion.jsx'
+import { PanelEjercicio, PanelAgregar } from './EditoresPlan.jsx'
 import Icono from './Icono.jsx'
 import { uid } from '../lib/storage.js'
 
 const ICONO = { subir: '⬆️', mantener: '➡️', bajar: '⬇️', estancado: '⚠️', nuevo: '🆕' }
 const PAUSAS = [60, 90, 120, 180]
 
-function PanelCambio({ original, actual, cambiado, opciones, modo, onModo, onElegir, onVolver }) {
-  const hay = opciones.parecidos.length + opciones.sinPiernas.length > 0
-  const Lista = ({ titulo, lista }) => lista.length === 0 ? null : (
-    <div className="cambio-grupo">
-      <strong>{titulo}</strong>
-      {lista.map(o => (
-        <button key={o.id} type="button" className="opcion-ej" onClick={() => onElegir(o)}>
-          <span>{o.nombre}</span>
-          <span className="chip">{o.series} × {o.repsMin}-{o.repsMax}</span>
-        </button>
-      ))}
-    </div>
-  )
-  return (
-    <div className="cambio">
-      <div className="pildoras chicas" role="group" aria-label="Dónde aplicar el cambio">
-        <button type="button" className={modo === 'hoy' ? 'activa' : ''} onClick={() => onModo('hoy')}>Solo hoy</button>
-        <button type="button" className={modo === 'plan' ? 'activa' : ''} onClick={() => onModo('plan')}>En todo el plan</button>
-      </div>
-      <p className="nota">{modo === 'hoy' ? 'Solo para la sesión de hoy. Mañana vuelve el ejercicio de tu plan.' : `Reemplaza "${original.nombre}" en este día del plan, de acá en adelante.`}</p>
-      {!hay && <p className="nota">No encontré más opciones para este ejercicio.</p>}
-      <Lista titulo="Parecidos" lista={opciones.parecidos} />
-      <Lista titulo="Sin cargar las piernas" lista={opciones.sinPiernas} />
-      {cambiado && <button type="button" className="enlace" onClick={onVolver}>Volver a {original.nombre}</button>}
-    </div>
-  )
-}
+// Cambios solo por hoy: { fecha, sust: { 'Día|id': ejercicio }, quitados: ['Día|id'], extras: { 'Día': [ejercicio] } }
+const vacio = () => ({ sust: {}, quitados: [], extras: {} })
+const vigente = h => (h && h.fecha === new Date().toDateString()
+  ? { sust: { ...(h.sust || {}) }, quitados: [...(h.quitados || [])], extras: { ...(h.extras || {}) } }
+  : vacio())
 
 export default function Entrenar({ estado, actualizar, irA, entrada }) {
   const { plan, perfil, sesiones, ajustes } = estado
@@ -53,72 +33,129 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
   const [abierto, setAbierto] = useState(null) // id del ejercicio con la explicación abierta
   const [textosIA, setTextosIA] = useState({}) // explicaciones pedidas a la IA, por id
   const [cargandoIA, setCargandoIA] = useState('')
-  const [cambiando, setCambiando] = useState(null) // id del ejercicio que se está cambiando
+  const [panel, setPanel] = useState(null) // ejercicio con el panel de edición abierto
   const [modo, setModo] = useState('hoy') // 'hoy' | 'plan'
+  const [agregando, setAgregando] = useState(false)
+  const [modoAgregar, setModoAgregar] = useState('hoy')
   const [aviso, setAviso] = useState('')
+  const [editandoSesion, setEditandoSesion] = useState(null)
 
   const dia = plan ? plan.dias[Math.min(diaIdx, plan.dias.length - 1)] : null
   const cumplimiento = cumplimientoSemanal(sesiones, perfil.diasPorSemana)
 
-  // Cambios de ejercicios solo por hoy (se borran solos al día siguiente)
-  const hoyStr = new Date().toDateString()
-  const cambiosHoy = estado.hoyCambios && estado.hoyCambios.fecha === hoyStr ? estado.hoyCambios.sust : {}
+  // ---- Lo que se muestra hoy: el día del plan + los cambios de solo-hoy ----
+  const ch = vigente(estado.hoyCambios)
   const clave = ej => `${dia.nombre}|${ej.id}`
-  const ejerciciosHoy = dia ? dia.ejercicios.map(ej => cambiosHoy[clave(ej)] || ej) : []
-  const hayCambiosHoy = dia ? dia.ejercicios.some(ej => cambiosHoy[clave(ej)]) : false
+  const filas = dia
+    ? [
+        ...dia.ejercicios
+          .filter(orig => !ch.quitados.includes(clave(orig)))
+          .map(orig => ({ orig, ej: ch.sust[clave(orig)] || orig, extra: false })),
+        ...(ch.extras[dia.nombre] || []).map(ej => ({ orig: ej, ej, extra: true })),
+      ]
+    : []
+  const ejerciciosHoy = filas.map(f => f.ej)
+  const diaHoy = dia ? { ...dia, ejercicios: ejerciciosHoy } : null // el día tal como se entrena hoy
+  const hayCambiosHoy = dia
+    ? dia.ejercicios.some(ej => ch.sust[clave(ej)] || ch.quitados.includes(clave(ej))) || (ch.extras[dia.nombre] || []).length > 0
+    : false
   const tienePiernas = dia ? dia.ejercicios.some(ej => esDePierna(ej, perfil)) : false
 
   const sugerencias = useMemo(() => {
     if (!dia) return {}
     return Object.fromEntries(ejerciciosHoy.map(ej => [ej.id, sugerirProgresion(ej, sesiones)]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dia, sesiones, estado.hoyCambios])
+  }, [dia, sesiones, estado.hoyCambios, plan])
 
-  const guardarCambiosHoy = sust => actualizar(e => ({ ...e, hoyCambios: { fecha: new Date().toDateString(), sust } }))
-
-  const cambiarSoloHoy = (original, nuevo) => guardarCambiosHoy({ ...cambiosHoy, [clave(original)]: nuevo })
-
-  const volverAlOriginal = original => {
-    const resto = { ...cambiosHoy }
-    delete resto[clave(original)]
-    guardarCambiosHoy(resto)
-    setBorrador(b => { const c = { ...b }; delete c[(cambiosHoy[clave(original)] || {}).id]; return c })
+  // ---- Editar lo de hoy y editar el plan ----
+  const editarHoy = fn => actualizar(e => ({ ...e, hoyCambios: { fecha: new Date().toDateString(), ...fn(vigente(e.hoyCambios)) } }))
+  const editarDiaDelPlan = fn => actualizar(e => ({
+    ...e,
+    plan: { ...e.plan, dias: e.plan.dias.map(d => (d.nombre !== dia.nombre ? d : fn(d))) },
+  }))
+  const limpiarHoyDe = (v, orig) => {
+    delete v.sust[clave(orig)]
+    v.quitados = v.quitados.filter(k => k !== clave(orig))
+    return v
   }
+  const cerrarPaneles = () => { setPanel(null); setAgregando(false); setAviso('') }
+  const soltarBorrador = id => setBorrador(b => { const c = { ...b }; delete c[id]; return c })
 
-  const cambiarEnElPlan = (original, nuevo) => {
-    actualizar(e => ({
-      ...e,
-      plan: { ...e.plan, dias: e.plan.dias.map(d => d.nombre !== dia.nombre ? d : { ...d, ejercicios: d.ejercicios.map(x => (x.id === original.id ? nuevo : x)) }) },
-    }))
-  }
-
-  const usarAlternativa = (original, nuevo) => {
+  const cambiarEjercicio = (orig, actual, nuevo) => {
     if (modo === 'plan') {
-      const resto = { ...cambiosHoy }
-      delete resto[clave(original)]
-      guardarCambiosHoy(resto)
-      cambiarEnElPlan(original, nuevo)
+      editarHoy(v => limpiarHoyDe(v, orig))
+      editarDiaDelPlan(d => ({ ...d, ejercicios: d.ejercicios.map(x => (x.id === orig.id ? nuevo : x)) }))
     } else {
-      cambiarSoloHoy(original, nuevo)
+      editarHoy(v => { limpiarHoyDe(v, orig); v.sust[clave(orig)] = nuevo; return v })
     }
-    setBorrador(b => { const c = { ...b }; delete c[original.id]; return c })
-    setCambiando(null); setAbierto(null); setAviso('')
+    soltarBorrador(actual.id); cerrarPaneles()
+  }
+
+  const volverAlOriginal = (orig, actual) => {
+    editarHoy(v => limpiarHoyDe(v, orig))
+    soltarBorrador(actual.id); cerrarPaneles()
+  }
+
+  const quitarEjercicio = (orig, actual, { reemplazar }) => {
+    const reemplazo = reemplazar ? reemplazoAutomatico(orig, perfil, diaHoy) : null
+    if (modo === 'plan') {
+      if (!reemplazo && dia.ejercicios.length <= 1) { setAviso('Un día no puede quedar sin ejercicios.'); return }
+      editarHoy(v => limpiarHoyDe(v, orig))
+      editarDiaDelPlan(d => ({
+        ...d,
+        ejercicios: reemplazo ? d.ejercicios.map(x => (x.id === orig.id ? reemplazo : x)) : d.ejercicios.filter(x => x.id !== orig.id),
+      }))
+    } else if (reemplazo) {
+      editarHoy(v => { limpiarHoyDe(v, orig); v.sust[clave(orig)] = reemplazo; return v })
+    } else {
+      editarHoy(v => { limpiarHoyDe(v, orig); v.quitados.push(clave(orig)); return v })
+    }
+    soltarBorrador(actual.id); cerrarPaneles()
+  }
+
+  const quitarExtra = ej => {
+    editarHoy(v => { v.extras[dia.nombre] = (v.extras[dia.nombre] || []).filter(x => x.id !== ej.id); return v })
+    soltarBorrador(ej.id); cerrarPaneles()
+  }
+
+  const editarSeries = (orig, parche) => {
+    editarDiaDelPlan(d => ({ ...d, ejercicios: d.ejercicios.map(x => (x.id === orig.id ? { ...x, ...parche } : x)) }))
+    cerrarPaneles()
+  }
+
+  const agregarEjercicio = ej => {
+    if (ejerciciosHoy.some(x => x.id === ej.id)) { setAviso('Ese ejercicio ya está en este día.'); return }
+    if (modoAgregar === 'plan') {
+      editarDiaDelPlan(d => ({ ...d, ejercicios: [...d.ejercicios, ej] }))
+    } else {
+      editarHoy(v => { v.extras[dia.nombre] = [...(v.extras[dia.nombre] || []), ej]; return v })
+    }
+    cerrarPaneles()
   }
 
   const piernasCansadas = () => {
-    const cambios = cambiosPorFatiga(dia, perfil)
-    if (Object.keys(cambios).length === 0) { setAviso('Este día no tiene ejercicios de piernas.'); return }
-    const sust = { ...cambiosHoy }
-    Object.entries(cambios).forEach(([id, nuevo]) => { sust[`${dia.nombre}|${id}`] = nuevo })
-    guardarCambiosHoy(sust)
-    setBorrador({}); setCambiando(null); setAbierto(null); setAviso('')
+    const cambios = cambiosPorFatiga(diaHoy, perfil)
+    // solo se tocan los ejercicios que vienen del plan
+    const ids = Object.keys(cambios).filter(id => dia.ejercicios.some(x => x.id === id))
+    if (ids.length === 0) { setAviso('Este día no tiene ejercicios de piernas.'); return }
+    editarHoy(v => {
+      ids.forEach(id => {
+        v.quitados = v.quitados.filter(k => k !== `${dia.nombre}|${id}`)
+        v.sust[`${dia.nombre}|${id}`] = cambios[id]
+      })
+      return v
+    })
+    setBorrador({}); cerrarPaneles()
   }
 
   const deshacerHoy = () => {
-    const resto = {}
-    Object.entries(cambiosHoy).forEach(([k, v]) => { if (!k.startsWith(`${dia.nombre}|`)) resto[k] = v })
-    guardarCambiosHoy(resto)
-    setBorrador({})
+    editarHoy(v => {
+      Object.keys(v.sust).forEach(k => { if (k.startsWith(`${dia.nombre}|`)) delete v.sust[k] })
+      v.quitados = v.quitados.filter(k => !k.startsWith(`${dia.nombre}|`))
+      delete v.extras[dia.nombre]
+      return v
+    })
+    setBorrador({}); cerrarPaneles()
   }
 
   // Si venís desde "Hoy" con las piernas cansadas, se aplica al abrir
@@ -129,9 +166,10 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
 
   const cambiarCiclo = semanas => actualizar(e => ({ ...e, perfil: { ...e.perfil, cicloSemanas: semanas }, plan: { ...e.plan, semanasCiclo: semanas } }))
 
+  // ---- Plan nuevo ----
   const crearPlanReglas = () => {
     actualizar(e => ({ ...e, plan: generarPlan(e.perfil), hoyCambios: null }))
-    setDiaIdx(0); setBorrador({}); setFeedback(null); setNuevosRecords([]); setError(''); setCambiando(null)
+    setDiaIdx(0); setBorrador({}); setFeedback(null); setNuevosRecords([]); setError(''); cerrarPaneles()
   }
 
   const crearPlanIA = async () => {
@@ -139,7 +177,7 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
     try {
       const nuevo = await planConIA({ ajustes, perfil, planActual: plan, sesiones, comidas: estado.comidas })
       actualizar(e => ({ ...e, plan: nuevo, hoyCambios: null }))
-      setDiaIdx(0); setBorrador({}); setFeedback(null)
+      setDiaIdx(0); setBorrador({}); setFeedback(null); cerrarPaneles()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -218,6 +256,15 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
     setBorrador({})
   }
 
+  const guardarSesionEditada = nueva => {
+    actualizar(e => ({ ...e, sesiones: e.sesiones.map(s => (s.id === nueva.id ? nueva : s)) }))
+    setEditandoSesion(null)
+  }
+  const borrarSesion = id => {
+    actualizar(e => ({ ...e, sesiones: e.sesiones.filter(s => s.id !== id) }))
+    setEditandoSesion(null)
+  }
+
   const vencido = planVencido(plan)
 
   if (!plan) {
@@ -268,7 +315,7 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
 
       <div className="pildoras">
         {plan.dias.map((d, i) => (
-          <button key={i} className={i === diaIdx ? 'activa' : ''} onClick={() => { setDiaIdx(i); setFeedback(null); setNuevosRecords([]); setBorrador({}) }}>{d.nombre}</button>
+          <button key={i} className={i === diaIdx ? 'activa' : ''} onClick={() => { setDiaIdx(i); setFeedback(null); setNuevosRecords([]); setBorrador({}); cerrarPaneles() }}>{d.nombre}</button>
         ))}
       </div>
 
@@ -286,7 +333,6 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
             <p className="nota">Si jugaste, corriste o entrenaste fuerte ayer, cambio los ejercicios de piernas de hoy por otros que no las carguen. El plan no se modifica.</p>
           </div>
           <button type="button" onClick={piernasCansadas}>Cambiar ejercicios de piernas</button>
-          {aviso && <p className="nota">{aviso}</p>}
         </section>
       )}
       {hayCambiosHoy && (
@@ -295,40 +341,48 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
           <button type="button" onClick={deshacerHoy}>Volver al plan original</button>
         </section>
       )}
+      {aviso && <p className="aviso" role="status">{aviso}</p>}
 
-      {ejerciciosHoy.map((ej, n) => {
-        const original = dia.ejercicios[n]
-        const cambiado = ej.id !== original.id
+      {filas.length === 0 && <p className="nota centro">No queda ningún ejercicio hoy. Agregá uno abajo o volvé al plan original.</p>}
+
+      {filas.map(({ orig, ej, extra }, n) => {
+        const cambiado = !extra && ej.id !== orig.id
         const s = sugerencias[ej.id]
         const b = borrador[ej.id] || { peso: '', reps: [], rpe: '' }
         const unidad = ej.unidad === 'seg' ? 'seg' : 'reps'
+        const idPanel = extra ? `extra:${ej.id}` : orig.id
         return (
           <section key={ej.id} className="ejercicio">
             <div className="ej-cabecera">
               <span className="ej-num" aria-hidden="true">{n + 1}</span>
               <div className="ej-titulo">
                 <h3>{ej.nombre}</h3>
-                <span className="chip">{ej.series} × {ej.repsMin}-{ej.repsMax} {unidad}{cambiado ? ' · solo hoy' : ''}</span>
+                <span className="chip">{ej.series} × {ej.repsMin}-{ej.repsMax} {unidad}{cambiado || extra ? ' · solo hoy' : ''}</span>
               </div>
             </div>
             <div className="ej-acciones">
               <button className="enlace" onClick={() => setAbierto(abierto === ej.id ? null : ej.id)}>
                 <Icono nombre="ayuda" tam={16} /> {abierto === ej.id ? 'Ocultar explicación' : 'Cómo se hace'}
               </button>
-              <button className="enlace" onClick={() => { setCambiando(cambiando === original.id ? null : original.id); setModo('hoy') }}>
-                <Icono nombre="cambiar" tam={16} /> {cambiando === original.id ? 'Cerrar' : 'Cambiar ejercicio'}
+              <button className="enlace" onClick={() => { setPanel(panel === idPanel ? null : idPanel); setModo('hoy'); setAgregando(false); setAviso('') }}>
+                <Icono nombre="cambiar" tam={16} /> {panel === idPanel ? 'Cerrar' : 'Editar ejercicio'}
               </button>
             </div>
-            {cambiando === original.id && (
-              <PanelCambio
-                original={original}
+            {panel === idPanel && (
+              <PanelEjercicio
+                key={ej.id}
+                original={orig}
                 actual={ej}
                 cambiado={cambiado}
-                opciones={alternativas(original, perfil, dia)}
+                extra={extra}
+                opciones={alternativas(ej, perfil, diaHoy)}
+                reemplazo={extra ? null : reemplazoAutomatico(orig, perfil, diaHoy)}
                 modo={modo}
                 onModo={setModo}
-                onElegir={nuevo => usarAlternativa(original, nuevo)}
-                onVolver={() => { volverAlOriginal(original); setCambiando(null) }}
+                onCambiar={nuevo => cambiarEjercicio(orig, ej, nuevo)}
+                onQuitar={opc => (extra ? quitarExtra(ej) : quitarEjercicio(orig, ej, opc))}
+                onEditar={parche => editarSeries(orig, parche)}
+                onVolver={() => volverAlOriginal(orig, ej)}
               />
             )}
             {abierto === ej.id && (
@@ -353,6 +407,11 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
           </section>
         )
       })}
+
+      <button type="button" className="agregar-boton" onClick={() => { setAgregando(a => !a); setPanel(null); setModoAgregar('hoy'); setAviso('') }}>
+        <Icono nombre="mas" tam={18} /> {agregando ? 'Cerrar' : 'Agregar ejercicio'}
+      </button>
+      {agregando && <PanelAgregar perfil={perfil} dia={diaHoy} modo={modoAgregar} onModo={setModoAgregar} onAgregar={agregarEjercicio} />}
 
       {error && <p className="error">{error}</p>}
       <button className="primario grande" onClick={guardarSesion}>Guardar sesión</button>
@@ -383,9 +442,16 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
           {[...sesiones].reverse().slice(0, 5).map(s => (
             <details key={s.id}>
               <summary>{new Date(s.fecha).toLocaleDateString('es-AR')} · {s.diaNombre}</summary>
-              <ul>
-                {s.series.map((x, i) => <li key={i}>{x.nombre}: {x.pesoKg ? `${x.pesoKg} kg × ` : ''}{x.reps}</li>)}
-              </ul>
+              {editandoSesion === s.id ? (
+                <EditorSesion sesion={s} onGuardar={guardarSesionEditada} onBorrar={() => borrarSesion(s.id)} onCerrar={() => setEditandoSesion(null)} />
+              ) : (
+                <>
+                  <ul>
+                    {s.series.map((x, i) => <li key={i}>{x.nombre}: {x.pesoKg ? `${x.pesoKg} kg × ` : ''}{x.reps}</li>)}
+                  </ul>
+                  <button className="enlace" onClick={() => setEditandoSesion(s.id)}>Editar sesión</button>
+                </>
+              )}
             </details>
           ))}
         </section>

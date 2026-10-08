@@ -23,12 +23,13 @@ export const estadoInicial = {
     deporteDias: 2,
     deporteTemporada: 'en', // en | fuera
     cicloSemanas: 6, // cada cuántas semanas se renueva el plan: 4 | 6 | 8 | 12
+    zonasExcluidas: [], // zonas que no querés entrenar: 'Piernas', 'Core', etc.
   },
   plan: null,
   sesiones: [],
   comidas: [],
   recetas: [],
-  hoyCambios: null, // cambios de ejercicios solo por hoy: { fecha, sust: { 'Día|idOriginal': ejercicio } }
+  hoyCambios: null, // cambios solo por hoy: { fecha, sust: { 'Día|idOriginal': ejercicio }, quitados: ['Día|id'], extras: { 'Día': [ejercicio] } }
   elegidas: [], // recetas elegidas para la lista de compras: [{ id, factor }]
   ajustes: { apiKey: '', modelo: 'claude-sonnet-5-5' },
 }

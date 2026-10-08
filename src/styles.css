@@ -319,3 +319,17 @@ details ul { margin: 8px 0 0; padding-left: 18px; font-size: .9rem; color: var(-
   .descanso-barra i { transition: none; }
   button:active { transform: none; }
 }
+
+/* ---------- Editor de plan y de comidas ---------- */
+.agregar-boton { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-style: dashed; background: transparent; }
+.agregar h3 { margin: 0; }
+.agregar details { border-top: 1px solid var(--linea); padding-top: 10px; }
+.agregar summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.propio { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; }
+.editor { gap: 14px; }
+.editor-fila { display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--linea); }
+.editor-campos { display: flex; align-items: flex-end; gap: 10px; }
+.editor-campos label { flex: 1; min-width: 0; }
+fieldset.zonas { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+fieldset.zonas legend { padding: 0; margin-bottom: 8px; font-size: .9rem; color: var(--suave); }
+fieldset.zonas .pildoras { flex-wrap: wrap; }
