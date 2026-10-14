@@ -1,8 +1,10 @@
 import React from 'react'
 import { objetivosNutricion, DIVISIONES, GRUPOS } from '../lib/plan.js'
+import SelectorIntensidad from './Intensidad.jsx'
 
 export default function Perfil({ estado, actualizar, irA }) {
   const p = estado.perfil
+  const intensidadPlan = estado.plan ? (estado.plan.intensidad || 'moderada') : null
   const set = (campo, valor) => actualizar(e => ({ ...e, perfil: { ...e.perfil, [campo]: valor } }))
   const num = campo => ev => set(campo, ev.target.value === '' ? '' : Number(ev.target.value))
   const txt = campo => ev => set(campo, ev.target.value)
@@ -63,6 +65,7 @@ export default function Perfil({ estado, actualizar, irA }) {
             <option value="casa">En casa (mancuernas y peso corporal)</option>
           </select>
         </label>
+        <SelectorIntensidad valor={p.intensidad || 'moderada'} onElegir={v => set('intensidad', v)} planActual={intensidadPlan} />
         <label>División del plan
           <select value={p.division} onChange={txt('division')}>
             {Object.entries(DIVISIONES).map(([clave, d]) => <option key={clave} value={clave}>{d.nombre}</option>)}

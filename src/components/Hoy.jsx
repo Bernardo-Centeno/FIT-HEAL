@@ -1,7 +1,7 @@
 import React from 'react'
 import { objetivosNutricion, deporteActivo, planVencido, diasDesde, esDePierna } from '../lib/plan.js'
 import { totalesDelDia } from '../lib/alimentos.js'
-import { proximoDia, entrenoHoy, semanaActual, rachaSemanas, minutosEstimados } from '../lib/metricas.js'
+import { proximoDia, entrenoHoy, tipoDeHoy, semanaActual, rachaSemanas, minutosEstimados } from '../lib/metricas.js'
 import { Anillos, anillosDe } from './Graficos.jsx'
 import Icono from './Icono.jsx'
 
@@ -20,7 +20,7 @@ export default function Hoy({ estado, irA }) {
   const semana = semanaActual(sesiones, ahora)
   const hechas = semana.filter(d => d.entreno).length
   const racha = rachaSemanas(sesiones, perfil.diasPorSemana, ahora)
-  const tipoDia = yaEntreno ? 'entreno' : 'descanso'
+  const tipoDia = tipoDeHoy(estado, ahora)
   const metas = objetivosNutricion(perfil, tipoDia)
   const consumido = totalesDelDia(comidas, ahora)
   const faltan = Math.max(0, metas.kcal - consumido.kcal)

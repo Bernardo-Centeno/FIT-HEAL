@@ -23,6 +23,13 @@ export function proximoDia(plan, sesiones) {
   return { indice, dia: plan.dias[indice] }
 }
 
+// Tipo de día para la comida: lo que elegiste hoy (se guarda) o, si no elegiste, entreno si ya registraste una sesión.
+export function tipoDeHoy(estado, hoy = new Date()) {
+  const t = estado && estado.tipoDiaHoy
+  if (t && t.fecha === hoy.toDateString() && ['entreno', 'deporte', 'descanso'].includes(t.tipo)) return t.tipo
+  return entrenoHoy(estado ? estado.sesiones : [], hoy) ? 'entreno' : 'descanso'
+}
+
 export const entrenoHoy = (sesiones, hoy = new Date()) => (sesiones || []).some(s => mismoDia(s.fecha, hoy))
 
 // Lunes a domingo de esta semana

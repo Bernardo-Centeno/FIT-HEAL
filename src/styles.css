@@ -333,3 +333,14 @@ details ul { margin: 8px 0 0; padding-left: 18px; font-size: .9rem; color: var(-
 fieldset.zonas { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 fieldset.zonas legend { padding: 0; margin-bottom: 8px; font-size: .9rem; color: var(--suave); }
 fieldset.zonas .pildoras { flex-wrap: wrap; }
+
+/* ---------- Nutrientes e intensidad ---------- */
+.nutrientes { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--linea); }
+.nutrientes h3 { margin: 0; }
+.nutriente { display: flex; flex-direction: column; gap: 6px; font-size: .92rem; }
+.barra-n { height: 6px; border-radius: 6px; background: var(--linea); overflow: hidden; }
+.barra-n i { display: block; height: 100%; border-radius: 6px; background: var(--azul); transition: width .3s ease; }
+.barra-n i.ok { background: var(--verde); }
+.barra-n i.alto { background: var(--rojo); }
+.intensidad { display: flex; flex-direction: column; gap: 8px; }
+.intensidad .etiqueta { font-size: .9rem; color: var(--suave); }

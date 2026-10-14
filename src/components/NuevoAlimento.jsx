@@ -3,7 +3,7 @@ import { alimentoPropio } from '../lib/alimentos.js'
 import { buscarOnline } from '../lib/openfood.js'
 import { estimarAlimento } from '../lib/ai.js'
 
-const vacio = { nombre: '', kcal: '', p: '', c: '', g: '', unidadG: '', unidadNombre: '' }
+const vacio = { nombre: '', kcal: '', p: '', c: '', g: '', fib: '', az: '', na: '', unidadG: '', unidadNombre: '' }
 
 // Agregar un alimento que no está en la lista: buscarlo online, cargarlo a mano o estimarlo con IA (si hay clave).
 export default function NuevoAlimento({ textoInicial, ajustes, onGuardar, onCerrar }) {
@@ -23,7 +23,7 @@ export default function NuevoAlimento({ textoInicial, ajustes, onGuardar, onCerr
 
   const usarResultado = r => {
     const { alimento, error: err } = alimentoPropio({
-      nombre: r.nombre, kcal: r.kcal, p: r.p, c: r.c, g: r.g, unidadG: r.porcionG || '', unidadNombre: 'porción',
+      nombre: r.nombre, kcal: r.kcal, p: r.p, c: r.c, g: r.g, fib: r.fib, az: r.az, na: r.na, unidadG: r.porcionG || '', unidadNombre: 'porción',
     })
     if (err) { setError(err); return }
     onGuardar(alimento)
@@ -34,7 +34,7 @@ export default function NuevoAlimento({ textoInicial, ajustes, onGuardar, onCerr
     setError(''); setCargando('ia')
     try {
       const r = await estimarAlimento({ ajustes, texto: form.nombre.trim() || consulta.trim() })
-      setForm({ nombre: r.nombre, kcal: String(Math.round(r.kcal)), p: String(r.p), c: String(r.c), g: String(r.g), unidadG: r.porcionG ? String(r.porcionG) : '', unidadNombre: r.porcionG ? 'porción' : '' })
+      setForm({ nombre: r.nombre, kcal: String(Math.round(r.kcal)), p: String(r.p), c: String(r.c), g: String(r.g), fib: String(r.fib || ''), az: String(r.az || ''), na: String(r.na || ''), unidadG: r.porcionG ? String(r.porcionG) : '', unidadNombre: r.porcionG ? 'porción' : '' })
       setModo('manual')
     } catch (e) { setError(e.message) } finally { setCargando('') }
   }
@@ -83,6 +83,11 @@ export default function NuevoAlimento({ textoInicial, ajustes, onGuardar, onCerr
           <div className="fila">
             <label>Carbohidratos (g)<input type="number" inputMode="decimal" value={form.c} onChange={e => set('c', e.target.value)} /></label>
             <label>Grasas (g)<input type="number" inputMode="decimal" value={form.g} onChange={e => set('g', e.target.value)} /></label>
+          </div>
+          <div className="fila tres">
+            <label>Fibra (g)<input type="number" inputMode="decimal" value={form.fib} onChange={e => set('fib', e.target.value)} /></label>
+            <label>Azúcares (g)<input type="number" inputMode="decimal" value={form.az} onChange={e => set('az', e.target.value)} /></label>
+            <label>Sodio (mg)<input type="number" inputMode="decimal" value={form.na} onChange={e => set('na', e.target.value)} /></label>
           </div>
           <details>
             <summary>Cuánto pesa una unidad (opcional)</summary>

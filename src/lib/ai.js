@@ -41,6 +41,7 @@ async function llamar({ apiKey, modelo, system, content, maxTokens = 1500 }) {
 
 const resumenPerfil = p => `Perfil: ${p.sexo}, ${p.edad} años, ${p.pesoKg} kg, ${p.alturaCm} cm.
 Objetivo: ${p.objetivo}. Nivel: ${p.nivel}. Entrena ${p.diasPorSemana} días por semana en ${p.equipamiento}.
+Intensidad de entrenamiento elegida: ${p.intensidad === 'suave' ? 'suave (menos series, repeticiones más altas, esfuerzo 6-7 sobre 10)' : p.intensidad === 'intensa' ? 'intensa (más series, repeticiones más bajas, esfuerzo 8-9 sobre 10)' : 'moderada (esfuerzo 7-8 sobre 10)'}.
 Deporte: ${p.deporte && p.deporte.trim() && Number(p.deporteDias) > 0 ? `${p.deporte.trim()}, ${p.deporteDias} días por semana (${p.deporteTemporada === 'fuera' ? 'fuera de temporada' : 'en temporada'})` : 'ninguno'}.
 Lesiones o limitaciones: ${p.lesiones || 'ninguna'}.
 Horarios y vida diaria: ${p.horarios || 'sin datos'}.
@@ -112,6 +113,7 @@ export function parsearPlan(raw, perfil, hoy = new Date()) {
     creadoEl: hoy.toISOString(),
     semanasCiclo: 6,
     objetivo: perfil.objetivo,
+    intensidad: ['suave', 'moderada', 'intensa'].includes(perfil.intensidad) ? perfil.intensidad : 'moderada',
     origen: 'ia',
     nota: data.nota || '',
     dias: data.dias.map((d, i) => ({
@@ -171,12 +173,12 @@ Explicame cómo hacer el ejercicio "${ejercicio.nombre}" (${ejercicio.series} se
 export async function estimarAlimento({ ajustes, texto }) {
   const respuesta = await llamar({
     apiKey: ajustes.apiKey, modelo: ajustes.modelo, maxTokens: 300,
-    system: 'Sos un nutricionista argentino. Estimás valores nutricionales por cada 100 g de un alimento, tal como se come. Respondé SOLO un JSON, sin texto extra, con esta forma: {"nombre":"...","kcal":0,"p":0,"c":0,"g":0,"porcionG":0}. p, c y g son gramos de proteína, carbohidratos y grasas por 100 g. porcionG es el peso en gramos de una unidad o porción típica (0 si no aplica).',
+    system: 'Sos un nutricionista argentino. Estimás valores nutricionales por cada 100 g de un alimento, tal como se come. Respondé SOLO un JSON, sin texto extra, con esta forma: {"nombre":"...","kcal":0,"p":0,"c":0,"g":0,"fib":0,"az":0,"na":0,"porcionG":0}. p, c y g son gramos de proteína, carbohidratos y grasas por 100 g; fib es fibra en g, az azúcares totales en g y na sodio en mg, todo por 100 g. porcionG es el peso en gramos de una unidad o porción típica (0 si no aplica).',
     content: `Alimento: ${texto}`,
   })
   const m = respuesta.match(/\{[\s\S]*\}/)
   if (!m) throw new ErrorIA('No pude interpretar la respuesta. Probá de nuevo.')
   let d
   try { d = JSON.parse(m[0]) } catch { throw new ErrorIA('No pude interpretar la respuesta. Probá de nuevo.') }
-  return { nombre: String(d.nombre || texto), kcal: Number(d.kcal), p: Number(d.p) || 0, c: Number(d.c) || 0, g: Number(d.g) || 0, porcionG: Number(d.porcionG) || 0 }
+  return { nombre: String(d.nombre || texto), kcal: Number(d.kcal), p: Number(d.p) || 0, c: Number(d.c) || 0, g: Number(d.g) || 0, fib: Number(d.fib) || 0, az: Number(d.az) || 0, na: Number(d.na) || 0, porcionG: Number(d.porcionG) || 0 }
 }

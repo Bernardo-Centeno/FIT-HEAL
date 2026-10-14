@@ -99,8 +99,17 @@ export function elegirSplit(division, dias) {
   return (SPLITS[division] && SPLITS[division][dias]) || SPLITS.auto[dias]
 }
 
+// ---------- Intensidad del entrenamiento ----------
+// Cambia el volumen (series), el rango de repeticiones y el esfuerzo que se busca en cada serie.
+export const INTENSIDADES = {
+  suave: { label: 'Suave', esfuerzo: '6-7', rpeTope: 8, descripcion: 'Menos series y repeticiones más altas, con 3-4 repeticiones de reserva. Ideal para volver a entrenar, semanas de mucha carga con el deporte o poco tiempo.' },
+  moderada: { label: 'Moderada', esfuerzo: '7-8', rpeTope: 8.5, descripcion: 'El equilibrio: volumen normal y 2-3 repeticiones de reserva. Funciona para la mayoría.' },
+  intensa: { label: 'Intensa', esfuerzo: '8-9', rpeTope: 9.5, descripcion: 'Más series, repeticiones más bajas y series cerca del límite (1-2 de reserva). Pide más tiempo y más recuperación.' },
+}
+export const intensidadDe = perfil => (INTENSIDADES[perfil && perfil.intensidad] ? perfil.intensidad : 'moderada')
+
 // ---------- Series y repeticiones según objetivo ----------
-export function esquema(objetivo, nivel, tipo, unidad) {
+function esquemaBase(objetivo, nivel, tipo, unidad) {
   if (unidad === 'seg') return { series: 3, repsMin: 30, repsMax: 60 }
   const extraCompuesto = nivel === 'principiante' ? 0 : 1
   if (tipo === 'compuesto') {
@@ -111,6 +120,18 @@ export function esquema(objetivo, nivel, tipo, unidad) {
   if (objetivo === 'fuerza') return { series: 3, repsMin: 8, repsMax: 12 }
   if (objetivo === 'grasa') return { series: 3, repsMin: 12, repsMax: 15 }
   return { series: 3, repsMin: 10, repsMax: 15 }
+}
+
+export function esquema(objetivo, nivel, tipo, unidad, intensidad = 'moderada') {
+  const e = esquemaBase(objetivo, nivel, tipo, unidad)
+  if (unidad === 'seg' || intensidad === 'moderada' || !INTENSIDADES[intensidad]) return e
+  if (intensidad === 'suave') {
+    return { series: Math.max(2, e.series - 1), repsMin: e.repsMin + 2, repsMax: e.repsMax + 2 }
+  }
+  // intensa
+  const tope = tipo === 'compuesto' ? 5 : 4
+  const repsMin = Math.max(3, e.repsMin - 1)
+  return { series: Math.min(tope, e.series + 1), repsMin, repsMax: Math.max(repsMin + 2, e.repsMax - 2) }
 }
 
 // ---------- Deporte ----------
@@ -161,6 +182,7 @@ export function generarPlan(perfil, hoy = new Date()) {
     creadoEl: hoy.toISOString(),
     semanasCiclo: cicloElegido(perfil),
     objetivo: perfil.objetivo,
+    intensidad: intensidadDe(perfil),
     origen: 'reglas',
     nota: armarNota(perfil, dias),
     dias: elegirSplit(perfil.division, dias).map((clave, i) => {
@@ -209,7 +231,7 @@ export function generarPlan(perfil, hoy = new Date()) {
 
 // ---------- Ejercicio a partir de la biblioteca ----------
 function aEjercicio(base, perfil, bajarPiernas = false) {
-  const esq = esquema(perfil.objetivo, perfil.nivel, base.tipo, base.unidad)
+  const esq = esquema(perfil.objetivo, perfil.nivel, base.tipo, base.unidad, intensidadDe(perfil))
   const series = base.inferior && bajarPiernas ? Math.max(2, esq.series - 1) : esq.series
   return {
     id: slug(base.nombre), // sin posición: el historial del ejercicio se conserva entre planes
@@ -412,7 +434,8 @@ export function historialEjercicio(ejercicioId, sesiones) {
     })
 }
 
-export function sugerirProgresion(ej, sesiones) {
+export function sugerirProgresion(ej, sesiones, intensidad = 'moderada') {
+  const rpeTope = (INTENSIDADES[intensidad] || INTENSIDADES.moderada).rpeTope
   const hist = historialEjercicio(ej.id, sesiones)
   if (hist.length === 0) {
     return { accion: 'nuevo', pesoSugerido: ej.pesoKg || null, mensaje: ej.corporal
@@ -429,7 +452,7 @@ export function sugerirProgresion(ej, sesiones) {
   const todasSobreMin = reps.every(r => r >= ej.repsMin)
 
   if (llegoAlTope) {
-    if (rpeProm !== null && rpeProm > 8.5) {
+    if (rpeProm !== null && rpeProm > rpeTope) {
       return { accion: 'mantener', pesoSugerido: peso, mensaje: `Llegaste al tope de repeticiones, pero se sintió muy pesado (esfuerzo ${rpeProm.toFixed(1)}). Repetí con ${peso} kg y subí cuando te resulte más cómodo.` }
     }
     if (ej.corporal && peso === 0) {
@@ -473,7 +496,7 @@ export function feedbackSesion(plan, sesion, sesiones, ejerciciosDelDia = null) 
   if (!lista) return []
   return lista
     .filter(ej => sesion.series.some(s => s.ejercicioId === ej.id))
-    .map(ej => ({ ejercicio: ej.nombre, ...sugerirProgresion(ej, sesiones) }))
+    .map(ej => ({ ejercicio: ej.nombre, ...sugerirProgresion(ej, sesiones, plan.intensidad) }))
 }
 
 // Cumplimiento: sesiones en los últimos 7 días vs. objetivo semanal
@@ -515,6 +538,8 @@ export function objetivosNutricion(perfil, tipoDia = 'entreno') {
     proteinaG: Math.round(proteinaG),
     grasasG: Math.round(grasasG),
     carbosG: Math.round(carbosG),
+    fibraG: Math.round((14 * kcal) / 1000), // 14 g cada 1000 kcal (referencia habitual)
+    sodioMaxMg: 2000, // límite diario sugerido por la OMS (≈ 5 g de sal)
     mantenimientoKcal: Math.round(mantenimiento / 10) * 10,
   }
 }

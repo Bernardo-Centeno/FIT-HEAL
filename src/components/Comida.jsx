@@ -2,16 +2,84 @@ import React, { useMemo, useState } from 'react'
 import { objetivosNutricion, deporteActivo } from '../lib/plan.js'
 import { feedbackComida, sugerirComidaYReceta, listaDeCompras, reducirImagen } from '../lib/ai.js'
 import { uid } from '../lib/storage.js'
+import { buscarOnline } from '../lib/openfood.js'
 import {
   ALIMENTOS, CATEGORIAS, MOMENTOS, alimentoPorId, macrosDeItems, totalesDelDia, momentoSegunHora,
-  sugerirRecetas, textoCantidad, comprasDe, comprasATexto, registrarPropios, buscarAlimentos, CAT_PROPIOS,
+  sugerirRecetas, textoCantidad, comprasDe, comprasATexto, registrarPropios, buscarAlimentos, alimentoPropio, CAT_PROPIOS, menuDelDia,
 } from '../lib/alimentos.js'
 import { Anillos, anillosDe } from './Graficos.jsx'
+import { tipoDeHoy } from '../lib/metricas.js'
 import EditorComida from './EditorComida.jsx'
 import NuevoAlimento from './NuevoAlimento.jsx'
 
 function Macros({ m }) {
-  return <span className="nota">{m.kcal} kcal · P {Math.round(m.p)} g · C {Math.round(m.c)} g · G {Math.round(m.g)} g</span>
+  return <span className="nota">{m.kcal} kcal · P {Math.round(m.p)} g · C {Math.round(m.c)} g · G {Math.round(m.g)} g{m.fib ? ` · Fibra ${Math.round(m.fib)} g` : ''}</span>
+}
+
+// Arma el registro de comida a partir de una receta sugerida
+function comidaDeReceta(r) {
+  return {
+    id: uid(), fecha: new Date().toISOString(), descripcion: `${r.nombre} (×${r.factor})`, feedback: '', origen: 'receta',
+    items: r.ingredientes.map(i => ({ id: i.id, gramos: i.gramos })), kcal: r.kcal, p: r.p, c: r.c, g: r.g, fib: r.fib || 0, az: r.az || 0, na: r.na || 0,
+  }
+}
+
+// ---------- Fibra, sodio y azúcares del día ----------
+
+function FilaNutriente({ nombre, valor, unidad, meta, tipo }) {
+  // tipo 'meta': conviene llegar. tipo 'limite': conviene no pasarse.
+  const pct = meta ? Math.min(100, Math.round((valor / meta) * 100)) : 0
+  const pasado = tipo === 'limite' && meta && valor > meta
+  const clase = tipo === 'meta' ? (valor >= meta ? 'ok' : '') : (pasado ? 'alto' : 'ok')
+  return (
+    <div className="nutriente">
+      <div className="fila-sb"><span>{nombre}</span><strong>{valor} {unidad}{meta ? <span className="nota"> / {tipo === 'limite' ? 'máx. ' : ''}{meta} {unidad}</span> : null}</strong></div>
+      {meta ? <div className="barra-n" role="img" aria-label={`${nombre}: ${pct}%`}><i className={clase} style={{ width: `${pct}%` }} /></div> : null}
+    </div>
+  )
+}
+
+function Nutrientes({ metas, consumido }) {
+  return (
+    <div className="nutrientes">
+      <h3>Fibra y otros</h3>
+      <FilaNutriente nombre="Fibra" valor={consumido.fib} unidad="g" meta={metas.fibraG} tipo="meta" />
+      <FilaNutriente nombre="Sodio" valor={consumido.na} unidad="mg" meta={metas.sodioMaxMg} tipo="limite" />
+      <FilaNutriente nombre="Azúcares" valor={consumido.az} unidad="g" />
+      <p className="nota">Cuenta lo anotado con alimentos. Las comidas de IA o escritas a mano no suman acá. La fibra es una meta; el sodio, un límite. Los azúcares son totales (incluyen los de la fruta y la leche), así que son para mirar, no para limitar.</p>
+    </div>
+  )
+}
+
+// ---------- Menú del día ----------
+
+function MenuDelDia({ perfil, metas, comidas, tipoDia, actualizar }) {
+  const { menu, total } = useMemo(() => menuDelDia(perfil, metas), [perfil, metas])
+  const hoy = new Date().toDateString()
+  const anotada = r => comidas.some(c => new Date(c.fecha).toDateString() === hoy && c.descripcion === `${r.nombre} (×${r.factor})`)
+  const nombreDia = { entreno: 'día de entrenamiento', deporte: 'día de deporte', descanso: 'día de descanso' }[tipoDia]
+  return (
+    <section className="card">
+      <h2>Qué comer hoy</h2>
+      <p className="nota">Armado para tu {nombreDia}: unas {metas.kcal} kcal y {metas.proteinaG} g de proteína. Si algo no te cierra, abajo en "¿Qué como?" hay más opciones.</p>
+      {menu.map(x => (
+        <div key={x.momento} className="receta-op">
+          <span className="chip">{x.label}</span>
+          {x.receta ? (
+            <>
+              <div className="fila-sb"><h3>{x.receta.nombre}</h3><span className="chip">×{x.receta.factor}</span></div>
+              <Macros m={x.receta} />
+              {anotada(x.receta)
+                ? <span className="nota">Anotada ✓</span>
+                : <button onClick={() => actualizar(e => ({ ...e, comidas: [...e.comidas, comidaDeReceta(x.receta)] }))}>Ya la comí</button>}
+            </>
+          ) : <p className="nota">No encontré recetas con tus filtros para este momento.</p>}
+        </div>
+      ))}
+      <strong>Total del menú</strong>
+      <Macros m={total} />
+    </section>
+  )
 }
 
 // ---------- Registrar lo que comiste (sin IA) ----------
@@ -19,6 +87,7 @@ function Macros({ m }) {
 function Registrar({ actualizar, propios, ajustes }) {
   const [buscar, setBuscar] = useState('')
   const [agregando, setAgregando] = useState(false)
+  const [online, setOnline] = useState({ estado: 'idle', lista: [], error: '' }) // idle | cargando | listo
   const [alimentoId, setAlimentoId] = useState('')
   const [cantidad, setCantidad] = useState('')
   const [modo, setModo] = useState('g')
@@ -30,6 +99,16 @@ function Registrar({ actualizar, propios, ajustes }) {
 
   const elegir = id => { setAlimentoId(id); setModo('g'); setError('') }
   const encontrados = buscarAlimentos(buscar, propios)
+  const cambiarBusqueda = v => { setBuscar(v); setOnline({ estado: 'idle', lista: [], error: '' }) }
+  const buscarEnLinea = async () => {
+    setOnline({ estado: 'cargando', lista: [], error: '' })
+    try { setOnline({ estado: 'listo', lista: await buscarOnline(buscar), error: '' }) } catch (e) { setOnline({ estado: 'listo', lista: [], error: e.message }) }
+  }
+  const usarOnline = r => {
+    const { alimento, error: err } = alimentoPropio({ nombre: r.nombre, kcal: r.kcal, p: r.p, c: r.c, g: r.g, fib: r.fib, az: r.az, na: r.na, unidadG: r.porcionG || '', unidadNombre: 'porción' })
+    if (err) { setError(err); return }
+    guardarPropio(alimento)
+  }
   const guardarPropio = a => {
     actualizar(e => ({ ...e, alimentosPropios: [...(e.alimentosPropios || []), a] }))
     registrarPropios([a])
@@ -60,7 +139,7 @@ function Registrar({ actualizar, propios, ajustes }) {
       <h2>Anotar lo que comí</h2>
       <p className="nota">Elegí el alimento y la cantidad. Los valores son aproximados (carnes, arroz, fideos y legumbres secas, en crudo).</p>
       <label>Buscar
-        <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Ej: leche descremada, alfajor, milanesa" />
+        <input type="search" value={buscar} onChange={e => cambiarBusqueda(e.target.value)} placeholder="Ej: leche descremada, alfajor, milanesa" />
       </label>
       {buscar.trim() !== '' && (
         <div className="cambio-grupo">
@@ -70,7 +149,19 @@ function Registrar({ actualizar, propios, ajustes }) {
             </button>
           ))}
           {encontrados.length === 0 && <p className="nota">No lo tengo en la lista.</p>}
-          {!agregando && <button type="button" className="enlace" onClick={() => setAgregando(true)}>Agregar "{buscar.trim()}" a mis alimentos</button>}
+          {buscar.trim().length >= 2 && online.estado === 'idle' && (
+            <button type="button" className="enlace" onClick={buscarEnLinea}>Ver más opciones de "{buscar.trim()}" online</button>
+          )}
+          {online.estado === 'cargando' && <p className="nota">Buscando en Open Food Facts…</p>}
+          {online.estado === 'listo' && online.error && <p className="error" role="alert">{online.error}</p>}
+          {online.estado === 'listo' && !online.error && online.lista.length === 0 && <p className="nota">No encontré productos online con datos completos.</p>}
+          {online.lista.length > 0 && <strong>Online (Open Food Facts)</strong>}
+          {online.lista.map((r, i) => (
+            <button key={i} type="button" className="opcion-ej" onClick={() => usarOnline(r)}>
+              <span>{r.nombre}</span><span className="chip">{r.kcal} kcal / 100 g</span>
+            </button>
+          ))}
+          {!agregando && <button type="button" className="enlace" onClick={() => setAgregando(true)}>Cargar "{buscar.trim()}" a mano</button>}
         </div>
       )}
       {agregando && <NuevoAlimento textoInicial={buscar.trim()} ajustes={ajustes} onGuardar={guardarPropio} onCerrar={() => setAgregando(false)} />}
@@ -140,13 +231,7 @@ function QueComo({ perfil, metas, elegidas, actualizar }) {
     return { ...e, elegidas: lista.some(x => x.id === r.id) ? lista.filter(x => x.id !== r.id) : [...lista, { id: r.id, factor: r.factor }] }
   })
 
-  const yaLaComi = r => actualizar(e => ({
-    ...e,
-    comidas: [...e.comidas, {
-      id: uid(), fecha: new Date().toISOString(), descripcion: `${r.nombre} (×${r.factor})`, feedback: '', origen: 'receta',
-      items: r.ingredientes.map(i => ({ id: i.id, gramos: i.gramos })), kcal: r.kcal, p: r.p, c: r.c, g: r.g,
-    }],
-  }))
+  const yaLaComi = r => actualizar(e => ({ ...e, comidas: [...e.comidas, comidaDeReceta(r)] }))
 
   return (
     <section className="card">
@@ -345,8 +430,8 @@ export default function Comida({ estado, actualizar, irA }) {
   registrarPropios(propios)
 
   const hoy = new Date().toDateString()
-  const entrenoHoy = estado.sesiones.some(s => new Date(s.fecha).toDateString() === hoy)
-  const [tipoDia, setTipoDia] = useState(entrenoHoy ? 'entreno' : 'descanso') // entreno | deporte | descanso
+  const tipoDia = tipoDeHoy(estado) // entreno | deporte | descanso; lo que elegís se guarda para hoy
+  const setTipoDia = tipo => actualizar(e => ({ ...e, tipoDiaHoy: { fecha: new Date().toDateString(), tipo } }))
   const metas = objetivosNutricion(perfil, tipoDia)
   const consumido = totalesDelDia(comidas)
 
@@ -359,6 +444,7 @@ export default function Comida({ estado, actualizar, irA }) {
       <section className="card destacada">
         <div className="cabecera-metas">
           <h2>Metas de hoy</h2>
+          <p className="nota">¿Cómo es tu día? Elegilo y las metas y el menú se ajustan. Queda guardado para hoy.</p>
           <div className="pildoras chicas">
             <button className={tipoDia === 'entreno' ? 'activa' : ''} onClick={() => setTipoDia('entreno')}>Entreno</button>
             {deporteActivo(perfil) && <button className={tipoDia === 'deporte' ? 'activa' : ''} onClick={() => setTipoDia('deporte')}>Deporte</button>}
@@ -366,8 +452,11 @@ export default function Comida({ estado, actualizar, irA }) {
           </div>
         </div>
         <Anillos anillos={anillosDe(metas, consumido)} centroNumero={Math.max(0, metas.kcal - consumido.kcal)} centroTexto="kcal por comer" />
+        <Nutrientes metas={metas} consumido={consumido} />
         <p className="nota">Cuenta solo lo que anotaste hoy con cantidades. Son metas orientativas, no hace falta clavarlas al gramo.</p>
       </section>
+
+      <MenuDelDia perfil={perfil} metas={metas} comidas={comidas} tipoDia={tipoDia} actualizar={actualizar} />
 
       <Registrar actualizar={actualizar} propios={propios} ajustes={estado.ajustes} />
       <QueComo perfil={perfil} metas={metas} elegidas={elegidas} actualizar={actualizar} />

@@ -19,6 +19,11 @@ const SITIOS = [
   { id: 'casa', titulo: 'En casa', desc: 'Peso corporal y poco material' },
 ]
 const DEPORTES = ['Fútbol', 'Rugby', 'Pádel', 'Tenis', 'Running', 'Ciclismo', 'Básquet', 'Esquí']
+const INTENSIDAD_OPCIONES = [
+  { id: 'suave', titulo: 'Suave', desc: 'Menos series, más repeticiones. Para volver o ir tranquilo' },
+  { id: 'moderada', titulo: 'Moderada', desc: 'El equilibrio, funciona para la mayoría' },
+  { id: 'intensa', titulo: 'Intensa', desc: 'Más series, cerca del límite. Pide más recuperación' },
+]
 const PRESUPUESTOS = [
   { id: 'bajo', titulo: 'Ajustado' },
   { id: 'medio', titulo: 'Normal' },
@@ -120,6 +125,10 @@ export default function Onboarding({ actualizar }) {
             <h1>Cómo entrenás</h1>
             <Opciones una lista={NIVELES} valor={p.nivel} onElegir={v => poner('nivel', v)} />
             <Opciones una lista={SITIOS} valor={p.equipamiento} onElegir={v => poner('equipamiento', v)} />
+            <div>
+              <p className="onb-etiqueta">Intensidad</p>
+              <Opciones una lista={INTENSIDAD_OPCIONES} valor={p.intensidad || 'moderada'} onElegir={v => poner('intensidad', v)} />
+            </div>
             <div>
               <p className="onb-etiqueta">Días por semana</p>
               <div className="pildoras">

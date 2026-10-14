@@ -22,6 +22,7 @@ export const estadoInicial = {
     deporte: '', // vacío = ninguno
     deporteDias: 2,
     deporteTemporada: 'en', // en | fuera
+    intensidad: 'moderada', // suave | moderada | intensa
     cicloSemanas: 6, // cada cuántas semanas se renueva el plan: 4 | 6 | 8 | 12
     zonasExcluidas: [], // zonas que no querés entrenar: 'Piernas', 'Core', etc.
   },
@@ -30,6 +31,7 @@ export const estadoInicial = {
   comidas: [],
   recetas: [],
   hoyCambios: null, // cambios solo por hoy: { fecha, sust: { 'Día|idOriginal': ejercicio }, quitados: ['Día|id'], extras: { 'Día': [ejercicio] } }
+  tipoDiaHoy: null, // { fecha, tipo } lo que elegiste para hoy: 'entreno' | 'deporte' | 'descanso'
   alimentosPropios: [], // alimentos que cargaste vos: [{ id, nombre, kcal, p, c, g, unidad }] (valores cada 100 g)
   elegidas: [], // recetas elegidas para la lista de compras: [{ id, factor }]
   ajustes: { apiKey: '', modelo: 'claude-sonnet-5-5' },

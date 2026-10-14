@@ -6,6 +6,7 @@ import {
 import { planConIA, explicarEjercicio } from '../lib/ai.js'
 import { records as calcularRecords } from '../lib/metricas.js'
 import Explicacion from './Explicacion.jsx'
+import SelectorIntensidad from './Intensidad.jsx'
 import Descanso from './Descanso.jsx'
 import EditorSesion from './EditorSesion.jsx'
 import { PanelEjercicio, PanelAgregar } from './EditoresPlan.jsx'
@@ -63,7 +64,7 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
 
   const sugerencias = useMemo(() => {
     if (!dia) return {}
-    return Object.fromEntries(ejerciciosHoy.map(ej => [ej.id, sugerirProgresion(ej, sesiones)]))
+    return Object.fromEntries(ejerciciosHoy.map(ej => [ej.id, sugerirProgresion(ej, sesiones, plan.intensidad)]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dia, sesiones, estado.hoyCambios, plan])
 
@@ -304,6 +305,8 @@ export default function Entrenar({ estado, actualizar, irA, entrada }) {
             ))}
           </select>
         </label>
+        <SelectorIntensidad valor={perfil.intensidad || 'moderada'} planActual={plan.intensidad || 'moderada'}
+          onElegir={v => actualizar(e => ({ ...e, perfil: { ...e.perfil, intensidad: v } }))} />
         <p className="nota">Vas por la semana {semanaDelPlan(plan)} de {plan.semanasCiclo || 6}. Se renueva el {fechaRenovacion(plan).toLocaleDateString('es-AR')}.</p>
         <div className="fila">
           <button onClick={crearPlanReglas}>Plan nuevo (reglas)</button>

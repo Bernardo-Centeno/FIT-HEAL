@@ -65,6 +65,11 @@ export const ALIMENTOS = [
   A('hamburguesa-casera', 'Hamburguesa de carne (cocida)', 'Carnes y pescados', 250, 24, 0, 17, ['carne', 'vacuna'], { g: 110, uno: 'hamburguesa', varios: 'hamburguesas' }),
   A('salchicha', 'Salchicha de viena', 'Carnes y pescados', 280, 11, 3, 25, ['cerdo', 'carne'], { g: 40, uno: 'salchicha', varios: 'salchichas' }),
   A('sardinas-en-lata', 'Sardinas en lata (escurridas)', 'Carnes y pescados', 190, 24, 0, 10, ['pescado']),
+  A('pechuga-de-pollo-cocida', 'Pechuga de pollo (cocida, a la plancha)', 'Carnes y pescados', 165, 31, 0, 3.6, ['pollo', 'ave']),
+  A('pata-muslo-con-piel', 'Pata muslo de pollo con piel (cruda)', 'Carnes y pescados', 215, 17, 0, 16, ['pollo', 'ave']),
+  A('pollo-al-horno', 'Pollo al horno (con piel, cocido)', 'Carnes y pescados', 230, 27, 0, 13, ['pollo', 'ave']),
+  A('nuggets-de-pollo', 'Nuggets de pollo', 'Carnes y pescados', 270, 14, 17, 16, ['pollo', 'ave', 'gluten'], { g: 20, uno: 'nugget', varios: 'nuggets' }),
+  A('hamburguesa-de-pollo', 'Hamburguesa de pollo (cocida)', 'Carnes y pescados', 190, 20, 6, 9, ['pollo', 'ave'], { g: 100, uno: 'hamburguesa', varios: 'hamburguesas' }),
   // --- Más lácteos y huevos
   A('leche-descremada', 'Leche descremada', 'Lácteos y huevos', 35, 3.4, 5, 0.1, ['lacteo']),
   A('leche-sin-lactosa', 'Leche sin lactosa (entera)', 'Lácteos y huevos', 62, 3.2, 4.8, 3.3, []),
@@ -136,6 +141,44 @@ export const ALIMENTOS = [
   A('creatina', 'Creatina (polvo)', 'Otros', 0, 0, 0, 0),
 ]
 
+// Fibra (g), azúcares totales (g) y sodio (mg) cada 100 g. Valores aproximados de tablas de composición de alimentos.
+const MICROS = {
+  'pechuga-de-pollo': [0, 0, 70], 'carne-vacuna-magra': [0, 0, 65], 'carne-picada-magra': [0, 0, 70], 'atun-al-natural': [0, 0, 330],
+  'merluza': [0, 0, 80], 'salmon': [0, 0, 60], 'jamon-cocido': [0, 1, 1100], 'huevo': [0, 0.4, 140],
+  'leche-entera': [0, 4.8, 45], 'yogur-natural': [0, 5, 55], 'yogur-griego': [0, 4, 45], 'queso-cremoso': [0, 1, 600], 'ricota': [0, 3, 80],
+  'banana': [2.6, 12, 1], 'manzana': [2.4, 10, 1], 'naranja': [2.4, 9, 0], 'frutillas': [2, 5, 1], 'palta': [6.7, 0.7, 7], 'tomate': [1.2, 2.6, 5],
+  'lechuga': [1.3, 0.8, 28], 'zanahoria': [2.8, 4.7, 69], 'zapallito': [1, 2.5, 8], 'zapallo': [0.5, 2.8, 1], 'cebolla': [1.7, 4.2, 4],
+  'espinaca': [2.2, 0.4, 79], 'brocoli': [2.6, 1.7, 33], 'morron': [2.1, 4.2, 4], 'papa': [2.2, 0.8, 6], 'batata': [3, 4.2, 55],
+  'arroz': [1.3, 0.1, 5], 'fideos': [3, 3, 6], 'avena': [10, 1, 5], 'pan': [2.7, 4, 500], 'polenta': [2.4, 0.5, 3], 'quinoa': [7, 2, 5],
+  'lentejas': [11, 2, 6], 'garbanzos-cocidos': [6, 2.5, 250], 'pure-de-tomate': [1.5, 4, 150], 'aceite-de-oliva': [0, 0, 0],
+  'manteca-de-mani': [6, 9, 400], 'nueces': [6.7, 2.6, 2], 'miel': [0.2, 82, 4], 'proteina-whey': [1, 6, 300],
+  'milanesa-de-carne': [1, 1, 450], 'milanesa-de-pollo': [1, 1, 430], 'asado': [0, 0, 80], 'bife-de-chorizo': [0, 0, 70],
+  'muslo-de-pollo': [0, 0, 90], 'bondiola-de-cerdo': [0, 0, 60], 'chorizo': [0, 1, 1000], 'hamburguesa-casera': [0, 0, 400],
+  'salchicha': [0, 2, 1000], 'sardinas-en-lata': [0, 0, 500], 'leche-descremada': [0, 5, 45], 'leche-sin-lactosa': [0, 4.8, 45],
+  'yogur-descremado': [0, 5.5, 55], 'yogur-bebible': [0, 11, 50], 'queso-port-salut': [0, 0.5, 700], 'queso-rallado': [0, 1, 1600],
+  'queso-untable-light': [0, 4, 500], 'muzzarella': [0, 1, 600], 'dulce-de-leche': [0, 55, 120], 'crema-de-leche': [0, 3, 35],
+  'clara-de-huevo': [0, 0.7, 165], 'pera': [3.1, 10, 1], 'mandarina': [1.8, 10, 2], 'durazno': [1.5, 8, 0], 'uvas': [0.9, 16, 2],
+  'sandia': [0.4, 6, 1], 'melon': [0.9, 8, 16], 'anana': [1.4, 10, 1], 'kiwi': [3, 9, 3], 'arandanos': [2.4, 10, 1], 'limon': [2.8, 2.5, 2],
+  'pepino': [0.5, 1.7, 2], 'coliflor': [2, 1.9, 30], 'berenjena': [3, 3.5, 2], 'choclo': [2.7, 6, 15], 'arvejas': [5, 6, 5],
+  'remolacha': [2.8, 7, 78], 'acelga': [1.6, 1.1, 213], 'champignones': [1, 2, 5],
+  'arroz-cocido': [0.4, 0, 1], 'fideos-cocidos': [1.8, 0.6, 1], 'pan-integral': [6, 4, 450], 'pan-de-hamburguesa': [2.5, 6, 500],
+  'tostadas': [4, 5, 600], 'galletitas-de-agua': [3, 1, 700], 'galletitas-dulces': [2, 25, 350], 'cereales-azucarados': [3, 28, 450],
+  'granola': [7, 20, 50], 'harina-de-trigo': [3, 1, 2], 'papas-fritas-bolsa': [4, 0.5, 550], 'porotos': [8, 0.5, 240],
+  'almendras': [12, 4, 1], 'mani': [8.5, 4, 5], 'semillas-de-chia': [34, 0, 16], 'aceite-girasol': [0, 0, 0], 'manteca': [0, 0.1, 11],
+  'mayonesa': [0, 2, 600], 'azucar': [0, 100, 0],
+  'alfajor-chocolate': [2, 38, 180], 'alfajor-triple': [2, 38, 170], 'chocolate-con-leche': [2, 55, 80], 'chocolate-amargo': [11, 24, 20],
+  'helado-crema': [0.5, 21, 80], 'medialuna': [2, 12, 400], 'pizza-muzzarella': [2, 4, 600], 'empanada-de-carne': [2, 2, 500],
+  'gaseosa': [0, 10.5, 10], 'jugo-de-naranja': [0.2, 8.5, 1], 'cerveza': [0, 0, 5], 'vino-tinto': [0, 0.6, 5],
+  'cafe-con-leche': [0, 2.4, 20], 'mate-cocido-con-azucar': [0, 5, 2], 'barra-de-cereal': [4, 30, 150], 'barra-de-proteina': [5, 6, 200],
+  'creatina': [0, 0, 0],
+  'pechuga-de-pollo-cocida': [0, 0, 75], 'pata-muslo-con-piel': [0, 0, 85], 'pollo-al-horno': [0, 0, 90], 'nuggets-de-pollo': [1, 0.5, 520], 'hamburguesa-de-pollo': [0.5, 0.5, 380],
+}
+for (const a of ALIMENTOS) {
+  const m = MICROS[a.id] || [0, 0, 0]
+  a.fib = m[0]; a.az = m[1]; a.na = m[2]
+}
+export const MICROS_POR_ID = MICROS
+
 const POR_ID = Object.fromEntries(ALIMENTOS.map(a => [a.id, a]))
 export const alimentoPorId = id => POR_ID[id] || null
 
@@ -156,20 +199,25 @@ export function buscarAlimentos(texto, propios = [], limite = 8) {
   const lista = [...(propios || []), ...ALIMENTOS]
   const puntuar = a => {
     const n = normal(a.nombre)
-    if (!palabras.every(w => n.includes(w))) return -1
-    return n.startsWith(palabras[0]) ? 2 : 1
+    if (palabras.every(w => n.includes(w))) return n.startsWith(palabras[0]) ? 3 : 2
+    // también por etiqueta (ej: "pollo" encuentra el muslo aunque el nombre diga otra cosa)
+    const t = (a.tags || []).map(normal)
+    return palabras.every(w => n.includes(w) || t.includes(w)) ? 1 : -1
   }
   return lista.map(a => ({ a, s: puntuar(a) })).filter(x => x.s > 0).sort((x, y) => y.s - x.s).map(x => x.a).slice(0, limite)
 }
 
 // Valida y arma un alimento propio. Valores por cada 100 g. Devuelve { alimento } o { error }.
-export function alimentoPropio({ nombre, kcal, p, c, g, unidadG, unidadNombre }, idExistente = null) {
+export function alimentoPropio({ nombre, kcal, p, c, g, fib, az, na, unidadG, unidadNombre }, idExistente = null) {
   const n = String(nombre || '').trim()
   if (n.length < 2) return { error: 'Poné el nombre del alimento.' }
   const v = { kcal: Number(kcal), p: Number(p) || 0, c: Number(c) || 0, g: Number(g) || 0 }
   if (!(v.kcal >= 0) || kcal === '' || kcal == null) return { error: 'Poné las calorías cada 100 g (si no sabés, 0 solo para agua o similares).' }
   if (v.kcal > 900) return { error: 'Las calorías cada 100 g no pueden superar 900. Revisá el valor.' }
   if (v.p < 0 || v.c < 0 || v.g < 0 || v.p + v.c + v.g > 100.5) return { error: 'Proteína + carbohidratos + grasas no pueden superar 100 g cada 100 g.' }
+  const ex = { fib: Number(fib) || 0, az: Number(az) || 0, na: Number(na) || 0 }
+  if (ex.fib < 0 || ex.az < 0 || ex.na < 0) return { error: 'Fibra, azúcares y sodio no pueden ser negativos.' }
+  if (ex.fib > 100 || ex.az > 100) return { error: 'Fibra y azúcares no pueden superar 100 g cada 100 g.' }
   let unidad = null
   const ug = Number(unidadG)
   if (ug > 0) {
@@ -177,7 +225,7 @@ export function alimentoPropio({ nombre, kcal, p, c, g, unidadG, unidadNombre },
     unidad = { g: ug, uno: un, varios: un.endsWith('s') ? un : un + 's' }
   }
   const id = idExistente || 'p-' + normal(n).replace(/[^a-z0-9]+/g, '-').slice(0, 24) + '-' + Math.random().toString(36).slice(2, 6)
-  return { alimento: { id, nombre: n, cat: CAT_PROPIOS, kcal: Math.round(v.kcal), p: Math.round(v.p * 10) / 10, c: Math.round(v.c * 10) / 10, g: Math.round(v.g * 10) / 10, tags: [], unidad, propio: true } }
+  return { alimento: { id, nombre: n, cat: CAT_PROPIOS, kcal: Math.round(v.kcal), p: Math.round(v.p * 10) / 10, c: Math.round(v.c * 10) / 10, g: Math.round(v.g * 10) / 10, fib: Math.round(ex.fib * 10) / 10, az: Math.round(ex.az * 10) / 10, na: Math.round(ex.na), tags: [], unidad, propio: true } }
 }
 
 export const MOMENTOS = [
@@ -277,7 +325,7 @@ export const RECETAS = [
 const redondear1 = n => Math.round(n * 10) / 10
 
 export function macrosDeItems(items) {
-  const t = { kcal: 0, p: 0, c: 0, g: 0 }
+  const t = { kcal: 0, p: 0, c: 0, g: 0, fib: 0, az: 0, na: 0 }
   for (const it of items || []) {
     const a = alimentoPorId(it.id)
     if (!a) continue
@@ -286,21 +334,27 @@ export function macrosDeItems(items) {
     t.p += a.p * f
     t.c += a.c * f
     t.g += a.g * f
+    t.fib += (a.fib || 0) * f
+    t.az += (a.az || 0) * f
+    t.na += (a.na || 0) * f
   }
-  return { kcal: Math.round(t.kcal), p: redondear1(t.p), c: redondear1(t.c), g: redondear1(t.g) }
+  return { kcal: Math.round(t.kcal), p: redondear1(t.p), c: redondear1(t.c), g: redondear1(t.g), fib: redondear1(t.fib), az: redondear1(t.az), na: Math.round(t.na) }
 }
 
 export function totalesDelDia(comidas, fecha = new Date()) {
   const dia = fecha.toDateString()
-  const t = { kcal: 0, p: 0, c: 0, g: 0 }
+  const t = { kcal: 0, p: 0, c: 0, g: 0, fib: 0, az: 0, na: 0 }
   for (const c of comidas || []) {
     if (new Date(c.fecha).toDateString() !== dia) continue
     t.kcal += Number(c.kcal) || 0
     t.p += Number(c.p) || 0
     t.c += Number(c.c) || 0
     t.g += Number(c.g) || 0
+    t.fib += Number(c.fib) || 0
+    t.az += Number(c.az) || 0
+    t.na += Number(c.na) || 0
   }
-  return { kcal: Math.round(t.kcal), p: Math.round(t.p), c: Math.round(t.c), g: Math.round(t.g) }
+  return { kcal: Math.round(t.kcal), p: Math.round(t.p), c: Math.round(t.c), g: Math.round(t.g), fib: Math.round(t.fib), az: Math.round(t.az), na: Math.round(t.na) }
 }
 
 // ---------- Filtros según el perfil ----------
@@ -371,7 +425,7 @@ export function escalar(receta, factor = 1) {
     return { id, nombre: a ? a.nombre : id, gramos }
   })
   const m = macrosDeItems(ingredientes)
-  return { ...receta, factor, ingredientes, kcal: m.kcal, p: m.p, c: m.c, g: m.g }
+  return { ...receta, factor, ingredientes, kcal: m.kcal, p: m.p, c: m.c, g: m.g, fib: m.fib, az: m.az, na: m.na }
 }
 
 export function textoCantidad(id, gramos) {
@@ -440,4 +494,21 @@ export function comprasDe(elegidas) {
 
 export function comprasATexto(grupos) {
   return grupos.map(g => `${g.cat}\n${g.items.map(i => `- ${i.nombre}: ${i.texto}`).join('\n')}`).join('\n\n')
+}
+
+
+// Menú completo del día: una receta por momento, sin repetir, ajustada a las metas del día.
+export function menuDelDia(perfil, metas) {
+  const usadas = new Set()
+  const menu = MOMENTOS.map(m => {
+    const { opciones } = sugerirRecetas(perfil, metas, m.id)
+    const receta = opciones.find(r => !usadas.has(r.id)) || null
+    if (receta) usadas.add(receta.id)
+    return { momento: m.id, label: m.label, receta }
+  })
+  const total = menu.reduce((t, x) => {
+    if (!x.receta) return t
+    return { kcal: t.kcal + x.receta.kcal, p: t.p + x.receta.p, c: t.c + x.receta.c, g: t.g + x.receta.g, fib: t.fib + (x.receta.fib || 0) }
+  }, { kcal: 0, p: 0, c: 0, g: 0, fib: 0 })
+  return { menu, total: { kcal: Math.round(total.kcal), p: Math.round(total.p), c: Math.round(total.c), g: Math.round(total.g), fib: Math.round(total.fib) } }
 }

@@ -15,11 +15,17 @@ export function productoAAlimento(prod) {
   const nombre = String(prod.product_name_es || prod.product_name || '').trim()
   if (!nombre || kcal == null || kcal < 0 || kcal > 900 || p == null || c == null || g == null) return null
   if (p + c + g > 100.5) return null
+  const fib = num(nu.fiber_100g) ?? 0
+  const az = num(nu.sugars_100g) ?? 0
+  let na = num(nu.sodium_100g)
+  if (na != null) na *= 1000
+  else { const sal = num(nu.salt_100g); na = sal != null ? sal * 400 : 0 }
   const marca = String(prod.brands || '').split(',')[0].trim()
   const porcion = num(prod.serving_quantity)
   return {
     nombre: marca && !nombre.toLowerCase().includes(marca.toLowerCase()) ? `${nombre} (${marca})` : nombre,
     kcal: Math.round(kcal), p: Math.round(p * 10) / 10, c: Math.round(c * 10) / 10, g: Math.round(g * 10) / 10,
+    fib: Math.round(fib * 10) / 10, az: Math.round(az * 10) / 10, na: Math.round(na),
     porcionG: porcion && porcion > 0 && porcion < 1000 ? porcion : null,
   }
 }
