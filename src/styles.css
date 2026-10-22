@@ -344,3 +344,16 @@ fieldset.zonas .pildoras { flex-wrap: wrap; }
 .barra-n i.alto { background: var(--rojo); }
 .intensidad { display: flex; flex-direction: column; gap: 8px; }
 .intensidad .etiqueta { font-size: .9rem; color: var(--suave); }
+
+/* ---------- Agenda semanal ---------- */
+.agenda { display: flex; flex-direction: column; gap: 10px; }
+.agenda-fila { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+.agenda-fila select { flex: 0 0 62%; max-width: 62%; }
+
+/* ---------- Selector de día (Comida) ---------- */
+.selector-dia { gap: 10px; }
+.selector-dia .etiqueta { font-size: .9rem; color: var(--suave); }
+.selector-dia .pildoras { flex-wrap: wrap; }
+
+.elegido { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px; background: var(--fondo); border: 1px solid var(--linea); border-left: 4px solid var(--verde); border-radius: 12px; }
+.elegido > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }

@@ -6,7 +6,17 @@ export default function EditorComida({ comida, onGuardar, onCerrar }) {
   const tieneItems = Array.isArray(comida.items) && comida.items.length > 0
   const [items, setItems] = useState(() => (comida.items || []).map(i => ({ ...i })))
   const [descripcion, setDescripcion] = useState(comida.descripcion)
+  const aClave = iso => { const f = new Date(iso); return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}` }
+  const [dia, setDia] = useState(() => aClave(comida.fecha))
   const [error, setError] = useState('')
+
+  // Si cambiaste el día, la comida se mueve a esa fecha manteniendo la hora
+  const fechaNueva = () => {
+    if (dia === aClave(comida.fecha)) return comida.fecha
+    const [y, m, d] = dia.split('-').map(Number)
+    const orig = new Date(comida.fecha)
+    return new Date(y, m - 1, d, orig.getHours(), orig.getMinutes()).toISOString()
+  }
 
   const cambiar = (i, gramos) => setItems(l => l.map((x, j) => (j === i ? { ...x, gramos } : x)))
   const quitar = i => setItems(l => l.filter((_, j) => j !== i))
@@ -22,10 +32,10 @@ export default function EditorComida({ comida, onGuardar, onCerrar }) {
       }
       const macros = macrosDeItems(limpios)
       const desc = limpios.map(i => `${alimentoPorId(i.id).nombre.replace(/ \(.*\)$/, '')} ${textoCantidad(i.id, i.gramos)}`).join(', ')
-      onGuardar({ ...comida, items: limpios, descripcion: desc, ...macros })
+      onGuardar({ ...comida, fecha: fechaNueva(), items: limpios, descripcion: desc, ...macros })
     } else {
       if (!descripcion.trim()) { setError('Escribí qué comiste.'); return }
-      onGuardar({ ...comida, descripcion: descripcion.trim() })
+      onGuardar({ ...comida, fecha: fechaNueva(), descripcion: descripcion.trim() })
     }
   }
 
@@ -54,6 +64,9 @@ export default function EditorComida({ comida, onGuardar, onCerrar }) {
           <textarea rows={3} value={descripcion} onChange={e => setDescripcion(e.target.value)} />
         </label>
       )}
+      <label>Día de esta comida
+        <input type="date" value={dia} max={aClave(new Date().toISOString())} onChange={e => { if (e.target.value) setDia(e.target.value) }} />
+      </label>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="fila">
         <button type="button" className="primario" onClick={guardar}>Guardar cambios</button>

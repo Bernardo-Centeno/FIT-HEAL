@@ -4,8 +4,8 @@ import { feedbackComida, sugerirComidaYReceta, listaDeCompras, reducirImagen } f
 import { uid } from '../lib/storage.js'
 import { buscarOnline } from '../lib/openfood.js'
 import {
-  ALIMENTOS, CATEGORIAS, MOMENTOS, alimentoPorId, macrosDeItems, totalesDelDia, momentoSegunHora,
-  sugerirRecetas, textoCantidad, comprasDe, comprasATexto, registrarPropios, buscarAlimentos, alimentoPropio, CAT_PROPIOS, menuDelDia,
+  MOMENTOS, alimentoPorId, macrosDeItems, totalesDelDia, momentoSegunHora,
+  sugerirRecetas, textoCantidad, comprasDe, comprasATexto, registrarPropios, buscarAlimentos, alimentoPropio, menuDelDia,
 } from '../lib/alimentos.js'
 import { Anillos, anillosDe } from './Graficos.jsx'
 import { tipoDeHoy } from '../lib/metricas.js'
@@ -82,9 +82,40 @@ function MenuDelDia({ perfil, metas, comidas, tipoDia, actualizar }) {
   )
 }
 
+// ---------- Elegir el día que estás mirando (hoy o uno anterior) ----------
+
+const claveDia = f => `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
+const desdeClave = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d, 12) }
+const HORA_MOMENTO = { desayuno: 9, almuerzo: 13, merienda: 17, cena: 21 }
+const fechaLarga = f => f.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+function SelectorDia({ valor, onElegir }) {
+  const hoy = new Date()
+  const claves = Array.from({ length: 7 }, (_, i) => claveDia(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - i, 12)))
+  const etiqueta = (k, i) => {
+    if (i === 0) return 'Hoy'
+    if (i === 1) return 'Ayer'
+    return desdeClave(k).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' }).replace('.', '')
+  }
+  return (
+    <section className="card selector-dia">
+      <span className="etiqueta">Día que estás viendo</span>
+      <div className="pildoras chicas" role="group" aria-label="Elegir día">
+        {claves.map((k, i) => (
+          <button key={k} type="button" aria-pressed={valor === k} className={valor === k ? 'activa' : ''} onClick={() => onElegir(k)}>{etiqueta(k, i)}</button>
+        ))}
+      </div>
+      <label>Otra fecha
+        <input type="date" value={valor} max={claveDia(hoy)} onChange={e => { if (e.target.value) onElegir(e.target.value) }} />
+      </label>
+    </section>
+  )
+}
+
 // ---------- Registrar lo que comiste (sin IA) ----------
 
-function Registrar({ actualizar, propios, ajustes }) {
+function Registrar({ actualizar, propios, ajustes, diaClave, esHoy }) {
+  const [momentoPasado, setMomentoPasado] = useState('almuerzo')
   const [buscar, setBuscar] = useState('')
   const [agregando, setAgregando] = useState(false)
   const [online, setOnline] = useState({ estado: 'idle', lista: [], error: '' }) // idle | cargando | listo
@@ -124,22 +155,37 @@ function Registrar({ actualizar, propios, ajustes }) {
     setCantidad(''); setError('')
   }
 
+  // Hoy se anota a la hora actual; un día anterior, a la hora típica del momento elegido
+  const fechaDeRegistro = () => {
+    if (esHoy) return new Date().toISOString()
+    const f = desdeClave(diaClave)
+    f.setHours(HORA_MOMENTO[momentoPasado] || 12, 0, 0, 0)
+    return f.toISOString()
+  }
+
   const guardar = () => {
     if (plato.length === 0) { setError('Agregá al menos un alimento.'); return }
     const descripcion = plato.map(i => `${alimentoPorId(i.id).nombre.replace(/ \(.*\)$/, '')} ${textoCantidad(i.id, i.gramos)}`).join(', ')
     actualizar(e => ({
       ...e,
-      comidas: [...e.comidas, { id: uid(), fecha: new Date().toISOString(), descripcion, feedback: '', origen: 'manual', items: plato, ...macros }],
+      comidas: [...e.comidas, { id: uid(), fecha: fechaDeRegistro(), descripcion, feedback: '', origen: 'manual', items: plato, ...macros }],
     }))
     setPlato([]); setError('')
   }
 
   return (
     <section className="card">
-      <h2>Anotar lo que comí</h2>
-      <p className="nota">Elegí el alimento y la cantidad. Los valores son aproximados (carnes, arroz, fideos y legumbres secas, en crudo).</p>
+      <h2>{esHoy ? 'Anotar lo que comí' : `Agregar a ${fechaLarga(desdeClave(diaClave))}`}</h2>
+      {!esHoy && (
+        <label>¿En qué momento?
+          <select value={momentoPasado} onChange={e => setMomentoPasado(e.target.value)}>
+            {MOMENTOS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </label>
+      )}
+      <p className="nota">Buscá el alimento y poné la cantidad. Los valores son aproximados (carnes, arroz, fideos y legumbres secas, en crudo).</p>
       <label>Buscar
-        <input type="search" value={buscar} onChange={e => cambiarBusqueda(e.target.value)} placeholder="Ej: leche descremada, alfajor, milanesa" />
+        <input type="search" value={buscar} onChange={e => cambiarBusqueda(e.target.value)} placeholder="Escribí el alimento: pollo, leche, alfajor…" />
       </label>
       {buscar.trim() !== '' && (
         <div className="cambio-grupo">
@@ -166,33 +212,29 @@ function Registrar({ actualizar, propios, ajustes }) {
       )}
       {agregando && <NuevoAlimento textoInicial={buscar.trim()} ajustes={ajustes} onGuardar={guardarPropio} onCerrar={() => setAgregando(false)} />}
       {!agregando && buscar.trim() === '' && <button type="button" className="enlace" onClick={() => setAgregando(true)}>¿No está? Agregá un alimento</button>}
-      <label>Alimento
-        <select value={alimentoId} onChange={e => elegir(e.target.value)}>
-          <option value="">Elegí uno…</option>
-          {CATEGORIAS.map(cat => (
-            <optgroup key={cat} label={cat}>
-              {ALIMENTOS.filter(a => a.cat === cat).map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-            </optgroup>
-          ))}
-          {propios.length > 0 && (
-            <optgroup label={CAT_PROPIOS}>
-              {propios.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-            </optgroup>
-          )}
-        </select>
-      </label>
-      <div className="fila">
-        <label>Cantidad
-          <input type="number" inputMode="decimal" value={cantidad} onChange={e => setCantidad(e.target.value)} placeholder={modo === 'u' ? 'unidades' : 'gramos'} />
-        </label>
-        <label>Medida
-          <select value={modo} onChange={e => setModo(e.target.value)} disabled={!alimento || !alimento.unidad}>
-            <option value="g">gramos</option>
-            {alimento && alimento.unidad && <option value="u">{alimento.unidad.varios} (≈ {alimento.unidad.g} g c/u)</option>}
-          </select>
-        </label>
-      </div>
-      <button onClick={agregar}>Agregar al plato</button>
+      {alimento && (
+        <>
+          <div className="elegido">
+            <div>
+              <strong>{alimento.nombre}</strong>
+              <span className="nota">{alimento.kcal} kcal · P {alimento.p} g · C {alimento.c} g · G {alimento.g} g cada 100 g</span>
+            </div>
+            <button type="button" className="enlace" onClick={() => { setAlimentoId(''); setCantidad(''); setModo('g') }}>Cambiar</button>
+          </div>
+          <div className="fila">
+            <label>Cantidad
+              <input type="number" inputMode="decimal" value={cantidad} onChange={e => setCantidad(e.target.value)} placeholder={modo === 'u' ? 'unidades' : 'gramos'} />
+            </label>
+            <label>Medida
+              <select value={modo} onChange={e => setModo(e.target.value)} disabled={!alimento.unidad}>
+                <option value="g">gramos</option>
+                {alimento.unidad && <option value="u">{alimento.unidad.varios} (≈ {alimento.unidad.g} g c/u)</option>}
+              </select>
+            </label>
+          </div>
+        </>
+      )}
+      {alimento && <button onClick={agregar}>Agregar al plato</button>}
 
       {plato.length > 0 && (
         <div className="plato">
@@ -429,11 +471,22 @@ export default function Comida({ estado, actualizar, irA }) {
   const propios = estado.alimentosPropios || []
   registrarPropios(propios)
 
-  const hoy = new Date().toDateString()
-  const tipoDia = tipoDeHoy(estado) // entreno | deporte | descanso; lo que elegís se guarda para hoy
-  const setTipoDia = tipo => actualizar(e => ({ ...e, tipoDiaHoy: { fecha: new Date().toDateString(), tipo } }))
+  const [diaClave, setDiaClave] = useState(() => claveDia(new Date()))
+  const esHoy = diaClave === claveDia(new Date())
+  const fechaVista = esHoy ? new Date() : desdeClave(diaClave)
+
+  // Hoy: el tipo de día que elegís se guarda. Otro día: se calcula solo y se puede cambiar mientras lo mirás.
+  const [tipoOtroDia, setTipoOtroDia] = useState(null) // { clave, tipo }
+  const tipoDia = esHoy ? tipoDeHoy(estado) : (tipoOtroDia && tipoOtroDia.clave === diaClave ? tipoOtroDia.tipo : tipoDeHoy(estado, fechaVista))
+  const setTipoDia = tipo => {
+    if (esHoy) actualizar(e => ({ ...e, tipoDiaHoy: { fecha: new Date().toDateString(), tipo } }))
+    else setTipoOtroDia({ clave: diaClave, tipo })
+  }
   const metas = objetivosNutricion(perfil, tipoDia)
-  const consumido = totalesDelDia(comidas)
+  const consumido = totalesDelDia(comidas, fechaVista)
+  const delDia = comidas
+    .filter(c => new Date(c.fecha).toDateString() === fechaVista.toDateString())
+    .sort((x, y) => new Date(x.fecha) - new Date(y.fecha))
 
   const [editando, setEditando] = useState(null)
   const borrar = id => actualizar(e => ({ ...e, comidas: e.comidas.filter(c => c.id !== id) }))
@@ -441,10 +494,12 @@ export default function Comida({ estado, actualizar, irA }) {
 
   return (
     <div className="pantalla">
+      <SelectorDia valor={diaClave} onElegir={k => { setDiaClave(k); setEditando(null) }} />
+
       <section className="card destacada">
         <div className="cabecera-metas">
-          <h2>Metas de hoy</h2>
-          <p className="nota">¿Cómo es tu día? Elegilo y las metas y el menú se ajustan. Queda guardado para hoy.</p>
+          <h2>{esHoy ? 'Metas de hoy' : `Metas del ${fechaLarga(fechaVista)}`}</h2>
+          <p className="nota">{esHoy ? '¿Cómo es tu día? Elegilo y las metas y el menú se ajustan. Queda guardado para hoy.' : '¿Cómo fue ese día? Las metas se ajustan.'}</p>
           <div className="pildoras chicas">
             <button className={tipoDia === 'entreno' ? 'activa' : ''} onClick={() => setTipoDia('entreno')}>Entreno</button>
             {deporteActivo(perfil) && <button className={tipoDia === 'deporte' ? 'activa' : ''} onClick={() => setTipoDia('deporte')}>Deporte</button>}
@@ -453,47 +508,52 @@ export default function Comida({ estado, actualizar, irA }) {
         </div>
         <Anillos anillos={anillosDe(metas, consumido)} centroNumero={Math.max(0, metas.kcal - consumido.kcal)} centroTexto="kcal por comer" />
         <Nutrientes metas={metas} consumido={consumido} />
-        <p className="nota">Cuenta solo lo que anotaste hoy con cantidades. Son metas orientativas, no hace falta clavarlas al gramo.</p>
+        <p className="nota">Cuenta solo lo que anotaste ese día con cantidades. Son metas orientativas, no hace falta clavarlas al gramo.</p>
       </section>
 
-      <MenuDelDia perfil={perfil} metas={metas} comidas={comidas} tipoDia={tipoDia} actualizar={actualizar} />
+      {esHoy && <MenuDelDia perfil={perfil} metas={metas} comidas={comidas} tipoDia={tipoDia} actualizar={actualizar} />}
 
-      <Registrar actualizar={actualizar} propios={propios} ajustes={estado.ajustes} />
-      <QueComo perfil={perfil} metas={metas} elegidas={elegidas} actualizar={actualizar} />
-      <Compras elegidas={elegidas} actualizar={actualizar} />
-      <ConIA estado={estado} actualizar={actualizar} metas={metas} irA={irA} tipoDia={tipoDia} />
+      <Registrar actualizar={actualizar} propios={propios} ajustes={estado.ajustes} diaClave={diaClave} esHoy={esHoy} />
 
-      {comidas.length > 0 && (
-        <section className="card">
-          <h2>Últimas comidas</h2>
-          {[...comidas].reverse().slice(0, 10).map(c => (
-            <details key={c.id}>
-              <summary>{new Date(c.fecha).toLocaleDateString('es-AR')} · {c.descripcion.slice(0, 60)}{c.kcal ? ` · ${c.kcal} kcal` : ''}</summary>
-              {c.kcal ? <Macros m={c} /> : null}
-              {c.feedback ? <div className="respuesta">{c.feedback}</div> : null}
-              {editando === c.id ? (
-                <EditorComida comida={c} onGuardar={guardarComida} onCerrar={() => setEditando(null)} />
-              ) : (
-                <div className="fila">
-                  <button className="enlace" onClick={() => setEditando(c.id)}>Editar esta comida</button>
-                  <button className="enlace" onClick={() => borrar(c.id)}>Borrar esta comida</button>
-                </div>
-              )}
-            </details>
-          ))}
-        </section>
-      )}
+      <section className="card">
+        <h2>{esHoy ? 'Comidas de hoy' : `Comidas del ${fechaLarga(fechaVista)}`}</h2>
+        {delDia.length === 0 && <p className="nota">{esHoy ? 'Todavía no anotaste nada hoy.' : 'No hay nada anotado ese día. Podés agregarlo arriba.'}</p>}
+        {delDia.map(c => (
+          <details key={c.id}>
+            <summary>{new Date(c.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · {c.descripcion.slice(0, 60)}{c.kcal ? ` · ${c.kcal} kcal` : ''}</summary>
+            {c.kcal ? <Macros m={c} /> : null}
+            {c.feedback ? <div className="respuesta">{c.feedback}</div> : null}
+            {editando === c.id ? (
+              <EditorComida comida={c} onGuardar={guardarComida} onCerrar={() => setEditando(null)} />
+            ) : (
+              <div className="fila">
+                <button className="enlace" onClick={() => setEditando(c.id)}>Editar esta comida</button>
+                <button className="enlace" onClick={() => borrar(c.id)}>Borrar esta comida</button>
+              </div>
+            )}
+          </details>
+        ))}
+      </section>
 
-      {recetas.length > 0 && (
-        <section className="card">
-          <h2>Recetas guardadas (IA)</h2>
-          {[...recetas].reverse().slice(0, 8).map(r => (
-            <details key={r.id}>
-              <summary>{r.titulo}</summary>
-              <div className="respuesta">{r.texto}</div>
-            </details>
-          ))}
-        </section>
+      {esHoy ? (
+        <>
+          <QueComo perfil={perfil} metas={metas} elegidas={elegidas} actualizar={actualizar} />
+          <Compras elegidas={elegidas} actualizar={actualizar} />
+          <ConIA estado={estado} actualizar={actualizar} metas={metas} irA={irA} tipoDia={tipoDia} />
+          {recetas.length > 0 && (
+            <section className="card">
+              <h2>Recetas guardadas (IA)</h2>
+              {[...recetas].reverse().slice(0, 8).map(r => (
+                <details key={r.id}>
+                  <summary>{r.titulo}</summary>
+                  <div className="respuesta">{r.texto}</div>
+                </details>
+              ))}
+            </section>
+          )}
+        </>
+      ) : (
+        <p className="nota centro">Estás viendo un día anterior. Las sugerencias y la lista de compras están en "Hoy".</p>
       )}
     </div>
   )
